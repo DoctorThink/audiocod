@@ -5,9 +5,7 @@
     Emotional Intelligence Through Sound
 ```
 # AudiCod: Advanced Audio Analysis Framework
-
-**License:** MIT  
-**Python:** 3.8+  
+  
 **Build Status:** [Build Status Link Here](link-to-build-status)
 
 
