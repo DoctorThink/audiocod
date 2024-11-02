@@ -1,25 +1,25 @@
-import { Cpu, AudioWaveform, Users, Brain } from "lucide-react";
+import { AudioWaveform, Users, Brain, FileAudio } from "lucide-react";
 
 const features = [
   {
-    icon: <AudioWaveform className="w-8 h-8" />,
-    title: "Voice DNA Creation",
-    description: "Generate unique voice profiles with physical characteristics, acoustic properties, and speech patterns"
+    icon: <FileAudio className="w-8 h-8" />,
+    title: "MP3 Upload & Analysis",
+    description: "Upload your audio files for comprehensive voice and speech pattern analysis"
   },
   {
-    icon: <Brain className="w-8 h-8" />,
-    title: "Natural Speech Patterns",
-    description: "Advanced algorithms for realistic dialogue generation with emotional depth and context awareness"
+    icon: <AudioWaveform className="w-8 h-8" />,
+    title: "Audio Pattern Detection",
+    description: "Advanced algorithms detect speech patterns, voice characteristics, and audio quality metrics"
   },
   {
     icon: <Users className="w-8 h-8" />,
-    title: "Multi-Character Support",
-    description: "Create dynamic conversations between multiple characters with distinct personalities"
+    title: "Speaker Recognition",
+    description: "Identify and distinguish multiple speakers within your audio recordings"
   },
   {
-    icon: <Cpu className="w-8 h-8" />,
-    title: "Real-time Processing",
-    description: "Instant dialogue generation with environmental sound integration and acoustic modeling"
+    icon: <Brain className="w-8 h-8" />,
+    title: "Smart Transcription",
+    description: "AI-powered transcription with speaker labeling and conversation flow analysis"
   }
 ];
 
@@ -28,7 +28,7 @@ const Features = () => {
     <div className="py-20 bg-white">
       <div className="container mx-auto px-4">
         <h2 className="text-4xl font-bold text-center mb-12 text-primary-900">
-          Powerful Features
+          Audio Analysis Features
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
