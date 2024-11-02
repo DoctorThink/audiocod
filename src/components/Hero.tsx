@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 const Hero = () => {
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 overflow-hidden">
-      {/* Animated background elements */}
       <div className="absolute inset-0 flex justify-center items-center">
         {[...Array(8)].map((_, i) => (
           <div
@@ -22,14 +22,17 @@ const Hero = () => {
           className="text-center"
         >
           <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
-            Dialogue<span className="text-primary-300">Vox</span> 2.0
+            Audio<span className="text-primary-300">Analysis</span> AI
           </h1>
           <p className="text-xl md:text-2xl text-primary-100 mb-8 max-w-2xl mx-auto">
-            Advanced AI dialogue generation with precise voice characteristic mapping and natural speech patterns
+            Advanced AI-powered audio analysis with precise voice characteristic mapping and speaker recognition
           </p>
-          <button className="bg-primary-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-primary-400 transition-colors">
+          <Link 
+            to="/demo"
+            className="inline-block bg-primary-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-primary-400 transition-colors"
+          >
             Try Demo
-          </button>
+          </Link>
         </motion.div>
       </div>
     </div>
