@@ -1,21 +1,10 @@
 import { useState } from "react";
-import { Upload, Play, Pause, Volume2, Loader2 } from "lucide-react";
+import { Upload, Play, Pause, Volume2, Loader2, Waveform } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQuery } from "@tanstack/react-query";
-
-interface AnalysisResult {
-  speakers: {
-    id: number;
-    gender: string;
-    ageRange: string;
-    confidence: number;
-    speech: string;
-    clarity: number;
-  }[];
-  audioQuality: number;
-  backgroundNoise: number;
-}
+import { analyzeAudio } from "@/services/audioAnalysis";
+import { Progress } from "@/components/ui/progress";
 
 const Demo = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -23,41 +12,11 @@ const Demo = () => {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
-  const { data: analysisResult, refetch: runAnalysis } = useQuery<AnalysisResult>({
+  const { data: analysisResult, refetch: runAnalysis, isLoading } = useQuery({
     queryKey: ['audioAnalysis', file?.name],
     queryFn: async () => {
       if (!file) throw new Error('No file selected');
-
-      // Create FormData to send the file
-      const formData = new FormData();
-      formData.append('audio', file);
-
-      // Simulate API call with mock data for demonstration
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Mock analysis result
-      return {
-        speakers: [
-          {
-            id: 1,
-            gender: 'male',
-            ageRange: '30-40',
-            confidence: 92,
-            speech: "This quarterly report shows significant progress.",
-            clarity: 95
-          },
-          {
-            id: 2,
-            gender: 'female',
-            ageRange: '25-35',
-            confidence: 89,
-            speech: "I agree, the metrics are very promising.",
-            clarity: 92
-          }
-        ],
-        audioQuality: 88,
-        backgroundNoise: 0.2
-      };
+      return analyzeAudio(file);
     },
     enabled: false
   });
@@ -94,10 +53,10 @@ const Demo = () => {
     <div className="min-h-screen bg-gray-50 py-20">
       <div className="container mx-auto px-4">
         <h1 className="text-4xl font-bold text-center mb-12 text-primary-900">
-          Audio Analysis Demo
+          AI Audio Analysis
         </h1>
         
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
             <div className="flex flex-col items-center gap-6">
               <div className="w-full max-w-md">
@@ -148,8 +107,16 @@ const Demo = () => {
                   <Button 
                     className="w-full"
                     onClick={() => runAnalysis()}
+                    disabled={isLoading}
                   >
-                    Start Analysis
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      "Start Analysis"
+                    )}
                   </Button>
                 </div>
               )}
@@ -157,23 +124,86 @@ const Demo = () => {
           </div>
 
           {analysisResult && (
-            <div className="bg-white rounded-2xl shadow-xl p-8 font-mono text-sm animate-fade-in">
-              <div className="space-y-4">
+            <div className="bg-white rounded-2xl shadow-xl p-8 font-mono text-sm animate-fade-in space-y-8">
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-primary-900">Speaker Analysis</h2>
                 {analysisResult.speakers.map((speaker) => (
-                  <div key={speaker.id} className="space-y-2">
-                    <p className="text-gray-800">
-                      Speaker {speaker.id} &lt;voice: {speaker.gender}, age-range: {speaker.ageRange}, confidence: {speaker.confidence}%&gt; 
-                      <span className="text-primary-600">"{speaker.speech}"</span>
-                    </p>
-                    <p className="text-gray-500">[speech_clarity: {speaker.clarity}%, background_noise: low]</p>
+                  <div key={speaker.id} className="space-y-4 p-4 border border-gray-100 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-gray-800 font-semibold">
+                          Speaker {speaker.id}
+                        </p>
+                        <p className="text-gray-600">
+                          {speaker.gender}, {speaker.ageRange} years
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-primary-500">Confidence: {speaker.confidence}%</p>
+                        <p className="text-gray-500">Clarity: {speaker.clarity}%</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <p className="text-primary-600 italic">"{speaker.speech}"</p>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-gray-700">Emotional State:</p>
+                      <div className="space-y-2">
+                        {Object.entries(speaker.emotionalState).map(([emotion, value]) => (
+                          <div key={emotion} className="flex items-center gap-2">
+                            <span className="w-16 text-gray-600 capitalize">{emotion}</span>
+                            <Progress value={value * 100} className="h-2" />
+                            <span className="text-gray-500 w-12 text-right">{(value * 100).toFixed(0)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-              
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <p className="text-primary-500">[Audio_Quality_Score: {analysisResult.audioQuality}/100]</p>
-                <p className="text-primary-500">[Speaker_Recognition_Confidence: High]</p>
-                <p className="text-primary-500">[Background_Noise_Level: {analysisResult.backgroundNoise}dB]</p>
+
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-primary-900">Audio Quality Metrics</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 border border-gray-100 rounded-lg">
+                    <p className="text-gray-600 mb-2">Quality Score</p>
+                    <p className="text-2xl font-bold text-primary-500">
+                      {analysisResult.audioQuality.score}/100
+                    </p>
+                  </div>
+                  <div className="p-4 border border-gray-100 rounded-lg">
+                    <p className="text-gray-600 mb-2">Signal-to-Noise Ratio</p>
+                    <p className="text-2xl font-bold text-primary-500">
+                      {analysisResult.audioQuality.signalToNoiseRatio.toFixed(1)} dB
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-primary-900">Dialogue Statistics</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 border border-gray-100 rounded-lg">
+                    <p className="text-gray-600">Duration</p>
+                    <p className="text-xl font-bold text-primary-500">
+                      {analysisResult.dialogueStatistics.totalDuration.toFixed(1)}s
+                    </p>
+                  </div>
+                  <div className="p-4 border border-gray-100 rounded-lg">
+                    <p className="text-gray-600">Turn Count</p>
+                    <p className="text-xl font-bold text-primary-500">
+                      {analysisResult.dialogueStatistics.turnCount}
+                    </p>
+                  </div>
+                  <div className="p-4 border border-gray-100 rounded-lg">
+                    <p className="text-gray-600">Overlap Count</p>
+                    <p className="text-xl font-bold text-primary-500">
+                      {analysisResult.dialogueStatistics.overlapCount}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
