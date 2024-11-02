@@ -1,8 +1,8 @@
-import { Cpu, Waveform, Users, Brain } from "lucide-react";
+import { Cpu, AudioWaveform, Users, Brain } from "lucide-react";
 
 const features = [
   {
-    icon: <Waveform className="w-8 h-8" />,
+    icon: <AudioWaveform className="w-8 h-8" />,
     title: "Voice DNA Creation",
     description: "Generate unique voice profiles with physical characteristics, acoustic properties, and speech patterns"
   },
