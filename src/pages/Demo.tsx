@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, Play, Pause, Volume2, Loader2, Waveform } from "lucide-react";
+import { Upload, Play, Pause, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQuery } from "@tanstack/react-query";
