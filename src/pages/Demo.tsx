@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import AudioRecorder from "@/components/audio/AudioRecorder";
 import EmotionChart from "@/components/audio/EmotionChart";
 import VoiceMetrics from "@/components/audio/VoiceMetrics";
@@ -12,6 +14,7 @@ import { analyzeAudio, type AnalysisResult } from "@/services/audioAnalysis";
 
 const Demo = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: analysisResults, refetch: runAnalysis, isLoading } = useQuery({
@@ -25,6 +28,7 @@ const Demo = () => {
 
   const handleRecordingComplete = (blob: Blob) => {
     setAudioBlob(blob);
+    setAudioUrl(URL.createObjectURL(blob));
     toast({
       title: "Recording complete",
       description: "You can now analyze the audio.",
@@ -32,8 +36,18 @@ const Demo = () => {
   };
 
   return (
-    <div className="container py-8 space-y-8">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="container py-8 space-y-8"
+    >
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <Link to="/" className="self-start">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
         <h1 className="text-3xl font-bold">Voice DNA Analysis</h1>
         <div className="flex gap-4 w-full sm:w-auto">
           <AudioRecorder onRecordingComplete={handleRecordingComplete} />
@@ -59,8 +73,34 @@ const Demo = () => {
         </div>
       </div>
 
+      {audioUrl && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Recorded Audio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <audio controls className="w-full">
+                <source src={audioUrl} type="audio/wav" />
+                Your browser does not support the audio element.
+              </audio>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {analysisResults && (
-        <div className="space-y-8 animate-fade-in">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="space-y-8 animate-fade-in"
+        >
           <Card>
             <CardHeader>
               <CardTitle>Transcription</CardTitle>
@@ -71,8 +111,20 @@ const Demo = () => {
           </Card>
 
           <div className="grid md:grid-cols-2 gap-8">
-            <VoiceMetrics speakerProfile={analysisResults.speakerProfile} />
-            <EmotionChart emotions={analysisResults.emotions} />
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <VoiceMetrics speakerProfile={analysisResults.speakerProfile} />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <EmotionChart emotions={analysisResults.emotions} />
+            </motion.div>
           </div>
 
           <Card>
@@ -116,9 +168,9 @@ const Demo = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
