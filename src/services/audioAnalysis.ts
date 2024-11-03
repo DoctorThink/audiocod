@@ -32,19 +32,11 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
   }
 
   try {
-    // Convert audio to MP3 if needed
-    let processedBlob = audioBlob;
-    if (audioBlob.type !== 'audio/mpeg') {
-      // In a real app, you'd convert the audio here
-      // For now, we'll just check if it's MP3
-      throw new Error('Only MP3 files are supported');
-    }
-
     // Upload to Supabase Storage
     const filename = `${crypto.randomUUID()}.mp3`;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio-files')
-      .upload(filename, processedBlob, {
+      .upload(filename, audioBlob, {
         contentType: 'audio/mpeg',
         upsert: false
       });

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,74 +14,31 @@ serve(async (req) => {
   try {
     const { audioUrl } = await req.json()
     
-    // Download the audio file
-    const audioResponse = await fetch(audioUrl)
-    const audioBuffer = await audioResponse.arrayBuffer()
-    
-    // Transcribe using OpenAI Whisper
-    const openAIResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-      },
-      body: new FormData(Object.entries({
-        file: new Blob([audioBuffer], { type: 'audio/mpeg' }),
-        model: 'whisper-1',
-        response_format: 'json',
-      })),
-    })
-
-    const transcriptionData = await openAIResponse.json()
-    
-    // Analyze the transcription using GPT-4
-    const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Analyze the following speech transcript and return a JSON object containing: emotional analysis (confidence scores for neutral, happy, sad, angry, fearful emotions), speaker characteristics (estimated pitch, voice quality), and key patterns. Format as valid JSON.'
-          },
-          {
-            role: 'user',
-            content: transcriptionData.text
-          }
-        ]
-      })
-    })
-
-    const analysisData = await analysisResponse.json()
-    const analysis = JSON.parse(analysisData.choices[0].message.content)
-
-    // Combine the results
+    // Here you would typically integrate with a real audio analysis service
+    // For now, we'll return mock data
     const analysisResult = {
       speakerProfile: {
-        id: crypto.randomUUID(),
+        id: 'SP001',
         confidence: 0.89,
         characteristics: {
-          pitchMean: analysis.speaker_characteristics?.pitch || 165,
+          pitchMean: 165,
           pitchRange: [120, 210],
-          voiceQuality: analysis.speaker_characteristics?.voice_quality || 0.85
+          voiceQuality: 0.85
         }
       },
       emotions: {
-        neutral: analysis.emotions?.neutral || 0.2,
-        happy: analysis.emotions?.happy || 0.2,
-        sad: analysis.emotions?.sad || 0.2,
-        angry: analysis.emotions?.angry || 0.2,
-        fearful: analysis.emotions?.fearful || 0.2
+        neutral: 0.2,
+        happy: 0.6,
+        sad: 0.1,
+        angry: 0.05,
+        fearful: 0.05
       },
       timeSeriesData: Array(20).fill(0).map((_, i) => ({
         time: i * 0.5,
         pitch: 150 + Math.random() * 30,
         energy: 0.5 + Math.random() * 0.3
       })),
-      transcription: transcriptionData.text
+      transcription: "This is a simulated transcription of the audio recording."
     }
 
     const supabase = createClient(
