@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { AudioWaveform } from "lucide-react";
+import { Waveform } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
@@ -60,7 +60,7 @@ const Index = () => {
                     delay: i * 0.2,
                   }}
                 >
-                  <AudioWaveform className="w-12 h-12 text-primary-300" />
+                  <Waveform className="w-12 h-12 text-primary-300" />
                 </motion.div>
               ))}
             </div>
