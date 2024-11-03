@@ -32,32 +32,50 @@ async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
   energy: number;
   timeSeriesData: Array<{ time: number; pitch: number; energy: number }>;
 }> {
-  const analyzer = Meyda.createMeydaAnalyzer({
-    audioContext: new AudioContext(),
-    source: audioBuffer,
-    bufferSize: 512,
-    featureExtractors: ["rms", "zcr", "spectralCentroid"]
-  });
+  return new Promise((resolve) => {
+    const audioContext = new AudioContext();
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    
+    const features: Array<{
+      spectralCentroid: number;
+      rms: number;
+    }> = [];
 
-  const features: any[] = [];
-  analyzer.start((frame) => {
-    features.push(frame);
-  });
+    const analyzer = Meyda.createMeydaAnalyzer({
+      audioContext,
+      source,
+      bufferSize: 512,
+      featureExtractors: ["rms", "spectralCentroid"],
+      callback: (frame) => {
+        features.push(frame);
+      }
+    });
 
-  // Process features
-  const pitches = features.map(f => f.spectralCentroid);
-  const energies = features.map(f => f.rms);
-  
-  return {
-    pitchMean: pitches.reduce((a, b) => a + b, 0) / pitches.length,
-    pitchRange: [Math.min(...pitches), Math.max(...pitches)],
-    energy: energies.reduce((a, b) => a + b, 0) / energies.length,
-    timeSeriesData: features.map((f, i) => ({
-      time: i * (512 / 44100), // Convert frames to seconds
-      pitch: f.spectralCentroid,
-      energy: f.rms
-    }))
-  };
+    analyzer.start();
+    source.start(0);
+
+    // Process for 2 seconds then resolve
+    setTimeout(() => {
+      source.stop();
+      analyzer.stop();
+      audioContext.close();
+
+      const pitches = features.map(f => f.spectralCentroid);
+      const energies = features.map(f => f.rms);
+      
+      resolve({
+        pitchMean: pitches.reduce((a, b) => a + b, 0) / pitches.length,
+        pitchRange: [Math.min(...pitches), Math.max(...pitches)],
+        energy: energies.reduce((a, b) => a + b, 0) / energies.length,
+        timeSeriesData: features.map((f, i) => ({
+          time: i * (512 / 44100), // Convert frames to seconds
+          pitch: f.spectralCentroid,
+          energy: f.rms
+        }))
+      });
+    }, 2000);
+  });
 }
 
 export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => {
@@ -66,9 +84,8 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
   }
 
   try {
-    // Upload to Supabase Storage
     const filename = `${crypto.randomUUID()}.mp3`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('audio-files')
       .upload(filename, audioBlob, {
         contentType: 'audio/mpeg',
@@ -77,15 +94,12 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
 
     if (uploadError) throw uploadError;
 
-    // Convert blob to AudioBuffer for analysis
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
-    // Process audio features
     const { pitchMean, pitchRange, energy, timeSeriesData } = await processAudioFeatures(audioBuffer);
 
-    // Calculate emotion probabilities based on audio features
     const emotions = {
       neutral: 0.2,
       happy: energy > 0.6 ? 0.4 : 0.1,
@@ -94,7 +108,6 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       fearful: energy < 0.2 ? 0.4 : 0.1
     };
 
-    // Store analysis results
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
