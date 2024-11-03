@@ -1,15 +1,53 @@
 import { useState } from "react";
-import { Upload, Play, Pause, Volume2 } from "lucide-react";
+import { Upload, Play, Pause, Volume2, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
+import { useToast } from "./ui/use-toast";
+import { analyzeAudio } from "@/services/audioAnalysis";
+import EmotionChart from "./audio/EmotionChart";
 
 const DialogueDemo = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const { toast } = useToast();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0];
     if (uploadedFile && uploadedFile.type === "audio/mpeg") {
       setFile(uploadedFile);
+      toast({
+        title: "File uploaded",
+        description: "Your audio file is ready for analysis.",
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Invalid file",
+        description: "Please upload an MP3 file.",
+      });
+    }
+  };
+
+  const handleAnalysis = async () => {
+    if (!file) return;
+    
+    setIsAnalyzing(true);
+    try {
+      const results = await analyzeAudio(file);
+      setAnalysisResults(results);
+      toast({
+        title: "Analysis complete",
+        description: "Your audio has been analyzed successfully.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Analysis failed",
+        description: error instanceof Error ? error.message : "An error occurred during analysis",
+      });
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -69,13 +107,32 @@ const DialogueDemo = () => {
 
                 <Button 
                   className="w-full"
-                  onClick={() => {
-                    // Analysis logic would go here
-                    console.log("Analyzing file:", file.name);
-                  }}
+                  onClick={handleAnalysis}
+                  disabled={isAnalyzing}
                 >
-                  Start Analysis
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    "Start Analysis"
+                  )}
                 </Button>
+              </div>
+            )}
+
+            {analysisResults && (
+              <div className="w-full space-y-6 mt-8">
+                <EmotionChart emotions={analysisResults.emotions} />
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2">Voice Characteristics</h3>
+                  <div className="space-y-2">
+                    <p>Pitch Mean: {analysisResults.speakerProfile.characteristics.pitchMean.toFixed(2)} Hz</p>
+                    <p>Voice Quality: {(analysisResults.speakerProfile.characteristics.voiceQuality * 100).toFixed(1)}%</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
