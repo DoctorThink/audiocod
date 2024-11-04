@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FileAudio, Waveform, Brain, ChartBar } from "lucide-react";
+import { FileAudio, AudioWaveform, Brain, ChartBar } from "lucide-react";
 
 const steps = [
   {
@@ -9,7 +9,7 @@ const steps = [
     description: "Upload your audio file or record directly through our interface"
   },
   {
-    icon: <Waveform className="w-8 h-8" />,
+    icon: <AudioWaveform className="w-8 h-8" />,
     number: "02",
     title: "Signal Processing",
     description: "Advanced algorithms analyze voice patterns and characteristics"

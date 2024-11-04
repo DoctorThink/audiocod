@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Waveform } from "lucide-react";
+import { AudioWaveform } from "lucide-react";
 
 const Hero = () => {
   return (
@@ -24,7 +24,7 @@ const Hero = () => {
           className="text-center"
         >
           <div className="flex items-center justify-center mb-6">
-            <Waveform className="w-12 h-12 text-primary-300 mr-3" />
+            <AudioWaveform className="w-12 h-12 text-primary-300 mr-3" />
             <h1 className="text-5xl md:text-7xl font-bold text-white">
               Audio<span className="text-primary-300">Cod</span>
             </h1>

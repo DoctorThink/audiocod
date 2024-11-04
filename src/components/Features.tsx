@@ -1,4 +1,5 @@
-import { AudioWaveform, Brain, FileAudio, Fingerprint, Gauge, Users, VolumeX, Waveform } from "lucide-react";
+import { motion } from "framer-motion";
+import { AudioWaveform, Brain, FileAudio, Fingerprint, Gauge } from "lucide-react";
 
 const features = [
   {
