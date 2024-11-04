@@ -1,42 +1,63 @@
+import { motion } from "framer-motion";
+
 const ExampleOutput = () => {
   return (
     <div className="bg-gray-50 py-20">
       <div className="container mx-auto px-4">
-        <h2 className="text-4xl font-bold text-center mb-12 text-primary-900">
-          Analysis Results
-        </h2>
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-primary-900 mb-4">
+            Intelligent Analysis
+          </h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            See how AudioCod breaks down voice patterns and emotional signatures
+          </p>
+        </div>
         
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl p-8 font-mono text-sm">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true }}
+          className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl p-8 font-mono text-sm"
+        >
           <div className="space-y-4">
-            <div>
-              <p className="text-primary-500 mb-1">[Analyzing audio file...]</p>
-              <p className="text-primary-500 mb-1">[Detecting speakers...]</p>
-              <p className="text-primary-500 mb-4">[Processing speech patterns...]</p>
+            <div className="border-l-4 border-primary-500 pl-4">
+              <p className="text-primary-500 mb-1">[Initializing voice analysis...]</p>
+              <p className="text-primary-500 mb-1">[Processing audio patterns...]</p>
+              <p className="text-primary-500 mb-4">[Generating voice profile...]</p>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
               <p className="text-gray-800">
-                Speaker 1 &lt;voice: male, age-range: 30-40, confidence: 92%&gt; 
-                <span className="text-primary-600">"This quarterly report shows significant progress."</span>
+                <span className="text-primary-500">Voice Profile</span> 
+                <br />
+                Pitch Range: 120-180Hz
+                <br />
+                Clarity Score: 92%
+                <br />
+                Stability Index: 0.87
               </p>
-              <p className="text-gray-500">[speech_clarity: 95%, background_noise: low]</p>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
               <p className="text-gray-800">
-                Speaker 2 &lt;voice: female, age-range: 25-35, confidence: 89%&gt; 
-                <span className="text-primary-600">"I agree, the metrics are very promising."</span>
+                <span className="text-primary-500">Emotional Analysis</span>
+                <br />
+                Primary: Confident (0.82)
+                <br />
+                Secondary: Engaged (0.65)
+                <br />
+                Mood Trajectory: Positive
               </p>
-              <p className="text-gray-500">[speech_clarity: 92%, background_noise: low]</p>
             </div>
           </div>
           
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-primary-500">[Audio_Quality_Score: 88/100]</p>
-            <p className="text-primary-500">[Speaker_Recognition_Confidence: High]</p>
-            <p className="text-primary-500">[Background_Noise_Level: 0.2dB]</p>
+            <p className="text-primary-500">[Analysis Confidence: 94%]</p>
+            <p className="text-primary-500">[Processing Time: 1.2s]</p>
+            <p className="text-primary-500">[Audio Quality: High]</p>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
