@@ -9,6 +9,8 @@ export interface AnalysisResult {
       pitchMean: number;
       pitchRange: [number, number];
       voiceQuality: number;
+      clarity: number;
+      stability: number;
     };
   };
   emotions: {
@@ -24,6 +26,94 @@ export interface AnalysisResult {
     energy: number;
   }>;
   transcription?: string;
+}
+
+function calculateEmotions(timeSeriesData: Array<{ pitch: number; energy: number }>) {
+  // Calculate statistical measures
+  const pitches = timeSeriesData.map(d => d.pitch);
+  const energies = timeSeriesData.map(d => d.energy);
+  
+  const pitchMean = pitches.reduce((a, b) => a + b, 0) / pitches.length;
+  const energyMean = energies.reduce((a, b) => a + b, 0) / energies.length;
+  
+  const pitchVariance = pitches.reduce((a, b) => a + Math.pow(b - pitchMean, 2), 0) / pitches.length;
+  const energyVariance = energies.reduce((a, b) => a + Math.pow(b - energyMean, 2), 0) / energies.length;
+  
+  // Calculate emotion scores based on acoustic features
+  const happy = Math.min(
+    1,
+    (energyMean * 0.6 + (1 - pitchVariance) * 0.4) * 
+    (pitchMean > pitches[0] ? 1.2 : 0.8)  // Rising pitch indicates positive emotion
+  );
+  
+  const angry = Math.min(
+    1,
+    (energyVariance * 0.7 + energyMean * 0.3) * 
+    (pitchVariance > 0.3 ? 1.3 : 0.7)  // High pitch variance indicates intensity
+  );
+  
+  const sad = Math.min(
+    1,
+    ((1 - energyMean) * 0.5 + (1 - pitchMean / Math.max(...pitches)) * 0.5) *
+    (pitchMean < pitches[0] ? 1.2 : 0.8)  // Falling pitch indicates negative emotion
+  );
+  
+  const fearful = Math.min(
+    1,
+    (pitchVariance * 0.6 + (1 - energyMean) * 0.4) *
+    (energyVariance > 0.3 ? 1.2 : 0.8)  // High energy variance indicates uncertainty
+  );
+  
+  // Calculate neutral as inverse of other emotions
+  const emotionSum = happy + angry + sad + fearful;
+  const neutral = Math.max(0, 1 - emotionSum / 4);
+  
+  // Normalize to ensure sum equals 1
+  const total = neutral + happy + sad + angry + fearful;
+  
+  return {
+    neutral: neutral / total,
+    happy: happy / total,
+    sad: sad / total,
+    angry: angry / total,
+    fearful: fearful / total
+  };
+}
+
+function calculateVoiceCharacteristics(timeSeriesData: Array<{ pitch: number; energy: number }>) {
+  const pitches = timeSeriesData.map(d => d.pitch);
+  const energies = timeSeriesData.map(d => d.energy);
+  
+  // Calculate pitch statistics
+  const pitchMean = pitches.reduce((a, b) => a + b, 0) / pitches.length;
+  const pitchMin = Math.min(...pitches);
+  const pitchMax = Math.max(...pitches);
+  
+  // Calculate energy statistics
+  const energyMean = energies.reduce((a, b) => a + b, 0) / energies.length;
+  const energyVariance = energies.reduce((a, b) => a + Math.pow(b - energyMean, 2), 0) / energies.length;
+  
+  // Calculate pitch stability (inverse of variance)
+  const pitchVariance = pitches.reduce((a, b) => a + Math.pow(b - pitchMean, 2), 0) / pitches.length;
+  const stability = 1 / (1 + pitchVariance);
+  
+  // Calculate voice clarity based on energy consistency
+  const clarity = 1 / (1 + energyVariance);
+  
+  // Calculate overall voice quality
+  const voiceQuality = (
+    clarity * 0.4 +
+    stability * 0.3 +
+    energyMean * 0.3
+  );
+  
+  return {
+    pitchMean,
+    pitchRange: [pitchMin, pitchMax] as [number, number],
+    voiceQuality,
+    clarity,
+    stability
+  };
 }
 
 async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
@@ -98,23 +188,19 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
-    const { pitchMean, pitchRange, energy, timeSeriesData } = await processAudioFeatures(audioBuffer);
-
-    const emotions = {
-      neutral: 0.2,
-      happy: energy > 0.6 ? 0.4 : 0.1,
-      sad: energy < 0.3 ? 0.4 : 0.1,
-      angry: energy > 0.8 ? 0.4 : 0.1,
-      fearful: energy < 0.2 ? 0.4 : 0.1
-    };
+    const { timeSeriesData } = await processAudioFeatures(audioBuffer);
+    
+    // Calculate emotions and voice characteristics based on time series data
+    const emotions = calculateEmotions(timeSeriesData);
+    const characteristics = calculateVoiceCharacteristics(timeSeriesData);
 
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
         file_path: filename,
-        pitch_mean: pitchMean,
-        pitch_range: pitchRange,
-        energy_level: energy
+        pitch_mean: characteristics.pitchMean,
+        pitch_range: characteristics.pitchRange,
+        energy_level: timeSeriesData.reduce((acc, curr) => acc + curr.energy, 0) / timeSeriesData.length
       });
 
     if (dbError) throw dbError;
@@ -122,12 +208,8 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     return {
       speakerProfile: {
         id: crypto.randomUUID(),
-        confidence: 0.85,
-        characteristics: {
-          pitchMean,
-          pitchRange,
-          voiceQuality: energy
-        }
+        confidence: characteristics.stability,
+        characteristics
       },
       emotions,
       timeSeriesData,
