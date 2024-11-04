@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import Meyda from "meyda";
+import * as tf from '@tensorflow/tfjs';
 import { calculateEmotions } from "./audio/emotionAnalysis";
 import { calculateVoiceCharacteristics, type VoiceCharacteristics } from "./audio/voiceCharacteristics";
 
@@ -26,43 +26,70 @@ export interface AnalysisResult {
 
 async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
   timeSeriesData: Array<{ time: number; pitch: number; energy: number }>;
+  spectralFeatures: Float32Array;
 }> {
-  return new Promise((resolve) => {
-    const audioContext = new AudioContext();
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
+  return new Promise(async (resolve) => {
+    const audioData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    const frameSize = 2048;
+    const hopSize = 512;
     
-    const features: Array<{
-      spectralCentroid: number;
-      rms: number;
-    }> = [];
-
-    const analyzer = Meyda.createMeydaAnalyzer({
-      audioContext,
-      source,
-      bufferSize: 512,
-      featureExtractors: ["rms", "spectralCentroid"],
-      callback: (frame) => {
-        features.push(frame);
+    // Convert audio data to tensor
+    const audioTensor = tf.tensor1d(audioData);
+    
+    // Apply short-time Fourier transform
+    const stft = tf.signal.stft(audioTensor, frameSize, hopSize);
+    const magnitudes = tf.abs(stft);
+    
+    // Calculate mel-spectrogram
+    const melSpectrogram = tf.signal.linearToMelSpectrogram(
+      magnitudes,
+      sampleRate,
+      frameSize,
+      40, // Number of mel bands
+      0,  // Minimum frequency
+      sampleRate / 2 // Maximum frequency
+    );
+    
+    // Extract features
+    const features = await melSpectrogram.data();
+    
+    // Process time series data
+    const timeSeriesData = Array.from({ length: Math.floor(audioData.length / hopSize) }, (_, i) => {
+      const time = i * (hopSize / sampleRate);
+      const startIdx = i * hopSize;
+      const frame = audioData.slice(startIdx, startIdx + frameSize);
+      
+      // Calculate pitch using autocorrelation
+      const acf = new Float32Array(frameSize);
+      for (let lag = 0; lag < frameSize; lag++) {
+        let sum = 0;
+        for (let n = 0; n < frameSize - lag; n++) {
+          sum += frame[n] * frame[n + lag];
+        }
+        acf[lag] = sum;
       }
+      
+      // Find pitch
+      let maxCorr = -Infinity;
+      let pitch = 0;
+      for (let lag = 30; lag < frameSize / 2; lag++) {
+        if (acf[lag] > maxCorr) {
+          maxCorr = acf[lag];
+          pitch = sampleRate / lag;
+        }
+      }
+      
+      // Calculate energy
+      const energy = frame.reduce((sum, val) => sum + val * val, 0) / frameSize;
+      
+      return { time, pitch, energy };
     });
 
-    analyzer.start();
-    source.start(0);
-
-    setTimeout(() => {
-      source.stop();
-      analyzer.stop();
-      audioContext.close();
-
-      resolve({
-        timeSeriesData: features.map((f, i) => ({
-          time: i * (512 / 44100),
-          pitch: f.spectralCentroid,
-          energy: f.rms
-        }))
-      });
-    }, 2000);
+    resolve({
+      timeSeriesData,
+      spectralFeatures: new Float32Array(features)
+    });
   });
 }
 
@@ -72,6 +99,9 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
   }
 
   try {
+    // Load TensorFlow.js model
+    await tf.ready();
+    
     const filename = `${crypto.randomUUID()}.mp3`;
     const { error: uploadError } = await supabase.storage
       .from('audio-files')
@@ -86,9 +116,10 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
-    const { timeSeriesData } = await processAudioFeatures(audioBuffer);
+    const { timeSeriesData, spectralFeatures } = await processAudioFeatures(audioBuffer);
     
-    const emotions = calculateEmotions(timeSeriesData);
+    // Use spectral features for emotion detection
+    const emotions = calculateEmotions(timeSeriesData, spectralFeatures);
     const characteristics = calculateVoiceCharacteristics(timeSeriesData);
 
     const { error: dbError } = await supabase
@@ -110,7 +141,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       },
       emotions,
       timeSeriesData,
-      transcription: "Transcription feature coming soon"
+      transcription: "Advanced transcription coming soon"
     };
   } catch (error) {
     console.error('Audio analysis error:', error);
