@@ -12,31 +12,37 @@ export type Database = {
       audio_analyses: {
         Row: {
           created_at: string | null
+          emotion_scores: Json | null
           energy_level: number | null
           file_path: string
           id: string
           pitch_mean: number | null
           pitch_range: number[] | null
+          spectral_features: number[] | null
           tempo: number | null
           transcription: string | null
         }
         Insert: {
           created_at?: string | null
+          emotion_scores?: Json | null
           energy_level?: number | null
           file_path: string
           id?: string
           pitch_mean?: number | null
           pitch_range?: number[] | null
+          spectral_features?: number[] | null
           tempo?: number | null
           transcription?: string | null
         }
         Update: {
           created_at?: string | null
+          emotion_scores?: Json | null
           energy_level?: number | null
           file_path?: string
           id?: string
           pitch_mean?: number | null
           pitch_range?: number[] | null
+          spectral_features?: number[] | null
           tempo?: number | null
           transcription?: string | null
         }
