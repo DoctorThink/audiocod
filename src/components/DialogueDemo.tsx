@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Upload, Play, Pause, Volume2, Loader2, Mic, Waveform } from "lucide-react";
+import { Loader2, Mic } from "lucide-react";
 import { Button } from "./ui/button";
 import { useToast } from "./ui/use-toast";
 import { analyzeAudio } from "@/services/audioAnalysis";
-import EmotionChart from "./audio/EmotionChart";
-import VoiceMetrics from "./audio/VoiceMetrics";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { motion, AnimatePresence } from "framer-motion";
-import { Progress } from "./ui/progress";
+import { Card, CardContent } from "./ui/card";
+import { motion } from "framer-motion";
+import AudioUploader from "./demo/AudioUploader";
+import AudioPlayer from "./demo/AudioPlayer";
+import AnalysisResults from "./demo/AnalysisResults";
 
 const DialogueDemo = () => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -56,7 +56,7 @@ const DialogueDemo = () => {
   };
 
   return (
-    <div className="bg-gradient-to-b from-gray-50 to-white py-20">
+    <div className="bg-gradient-to-b from-gray-50 to-white py-20 min-h-screen">
       <div className="container mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -73,71 +73,20 @@ const DialogueDemo = () => {
             </p>
           </div>
 
-          <Card className="mb-8">
+          <Card className="mb-8 bg-white/50 backdrop-blur-sm border-primary-100">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center gap-6">
-                <label 
-                  htmlFor="audio-upload"
-                  className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-primary-200 rounded-xl cursor-pointer hover:border-primary-400 transition-colors bg-primary-50/30"
-                >
-                  {!file ? (
-                    <>
-                      <Upload className="w-10 h-10 text-primary-400 mb-2" />
-                      <span className="text-sm text-primary-600 font-medium">Drop MP3 file here or click to upload</span>
-                      <span className="text-xs text-gray-500 mt-1">Maximum file size: 10MB</span>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <Waveform className="w-8 h-8 text-primary-500" />
-                      <span className="text-primary-600 font-medium">{file.name}</span>
-                    </div>
-                  )}
-                  <input
-                    id="audio-upload"
-                    type="file"
-                    accept=".mp3,audio/mpeg"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                </label>
+                <AudioUploader file={file} onFileUpload={handleFileUpload} />
 
                 {file && (
                   <div className="w-full space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setIsPlaying(!isPlaying)}
-                          className="w-12 h-12 rounded-full"
-                        >
-                          {isPlaying ? 
-                            <Pause className="w-6 h-6 text-primary-500" /> : 
-                            <Play className="w-6 h-6 text-primary-500" />
-                          }
-                        </Button>
-                        <div className="flex space-x-1">
-                          {[...Array(20)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="w-1 bg-primary-400 rounded-full"
-                              animate={{
-                                height: isPlaying ? [20, 40, 20] : 20
-                              }}
-                              transition={{
-                                duration: 0.5,
-                                repeat: isPlaying ? Infinity : 0,
-                                delay: i * 0.1
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <Volume2 className="w-6 h-6 text-gray-400" />
-                    </div>
+                    <AudioPlayer 
+                      isPlaying={isPlaying} 
+                      onPlayPause={() => setIsPlaying(!isPlaying)} 
+                    />
 
                     <Button 
-                      className="w-full"
+                      className="w-full bg-primary-500 hover:bg-primary-600 text-white"
                       onClick={handleAnalysis}
                       disabled={isAnalyzing}
                     >
@@ -159,43 +108,7 @@ const DialogueDemo = () => {
             </CardContent>
           </Card>
 
-          <AnimatePresence>
-            {analysisResults && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-8"
-              >
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Analysis Results</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-8">
-                    <div className="grid md:grid-cols-2 gap-8">
-                      <VoiceMetrics speakerProfile={analysisResults.speakerProfile} />
-                      <EmotionChart emotions={analysisResults.emotions} />
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg">Voice Quality Metrics</h3>
-                      <div className="space-y-6">
-                        {Object.entries(analysisResults.speakerProfile.characteristics).map(([key, value]: [string, number]) => (
-                          <div key={key} className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                              <span>{typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : value}</span>
-                            </div>
-                            <Progress value={typeof value === 'number' ? value * 100 : 0} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <AnalysisResults results={analysisResults} />
         </motion.div>
       </div>
     </div>
