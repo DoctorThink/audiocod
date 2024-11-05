@@ -28,7 +28,6 @@ async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
   timeSeriesData: Array<{ time: number; pitch: number; energy: number }>;
   spectralFeatures: Float32Array;
 }> {
-  // Initialize TensorFlow
   await tf.ready();
   
   return new Promise(async (resolve) => {
@@ -36,27 +35,32 @@ async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
     const sampleRate = audioBuffer.sampleRate;
     const frameSize = 2048;
     const hopSize = 512;
+    const fft = new Float32Array(frameSize);
+    const spectralFeatures = new Float32Array(40); // Number of mel bands
     
     // Convert audio data to tensor
     const audioTensor = tf.tensor1d(audioData);
     
     try {
-      // Apply short-time Fourier transform
-      const stft = tf.signal.stft(audioTensor, frameSize, hopSize);
-      const magnitudes = tf.abs(stft);
+      // Apply windowing
+      const hammingWindow = tf.signal.hammingWindow(frameSize);
+      const frames = tf.signal.frame(audioTensor, frameSize, hopSize);
+      const windowedFrames = tf.mul(frames, hammingWindow);
       
-      // Calculate mel-spectrogram
-      const melSpectrogram = tf.signal.linearToMelSpectrogram(
-        magnitudes,
-        sampleRate,
-        frameSize,
-        40, // Number of mel bands
-        0,  // Minimum frequency
-        sampleRate / 2 // Maximum frequency
-      );
+      // Compute magnitude spectrum
+      const spectrogramTensor = tf.abs(tf.spectral.rfft(windowedFrames));
+      const spectrogram = await spectrogramTensor.array();
       
-      // Extract features
-      const features = await melSpectrogram.data();
+      // Calculate average spectral features
+      const numFrames = spectrogram.length;
+      for (let i = 0; i < 40; i++) {
+        let sum = 0;
+        for (let j = 0; j < numFrames; j++) {
+          const binIndex = Math.floor((i / 40) * (frameSize / 2));
+          sum += spectrogram[j][binIndex];
+        }
+        spectralFeatures[i] = sum / numFrames;
+      }
       
       // Process time series data
       const timeSeriesData = Array.from({ length: Math.floor(audioData.length / hopSize) }, (_, i) => {
@@ -91,11 +95,11 @@ async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
       });
 
       // Cleanup tensors
-      tf.dispose([audioTensor, stft, magnitudes, melSpectrogram]);
+      tf.dispose([audioTensor, hammingWindow, frames, windowedFrames, spectrogramTensor]);
 
       resolve({
         timeSeriesData,
-        spectralFeatures: new Float32Array(features)
+        spectralFeatures
       });
     } catch (error) {
       // Cleanup on error
@@ -137,7 +141,9 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         file_path: filename,
         pitch_mean: characteristics.pitchMean,
         pitch_range: characteristics.pitchRange,
-        energy_level: timeSeriesData.reduce((acc, curr) => acc + curr.energy, 0) / timeSeriesData.length
+        energy_level: timeSeriesData.reduce((acc, curr) => acc + curr.energy, 0) / timeSeriesData.length,
+        spectral_features: Array.from(spectralFeatures),
+        emotion_scores: emotions
       });
 
     if (dbError) throw dbError;
@@ -149,8 +155,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         characteristics
       },
       emotions,
-      timeSeriesData,
-      transcription: "Advanced transcription coming soon"
+      timeSeriesData
     };
   } catch (error) {
     console.error('Audio analysis error:', error);
