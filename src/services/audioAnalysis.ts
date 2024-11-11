@@ -31,14 +31,34 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
 
   try {
     const filename = `${crypto.randomUUID()}.mp3`;
-    const { error: uploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(filename, audioBlob, {
-        contentType: 'audio/mpeg',
-        upsert: false
-      });
+    
+    // Upload with retry logic
+    let uploadAttempts = 0;
+    const maxAttempts = 3;
+    let uploadError = null;
 
-    if (uploadError) throw uploadError;
+    while (uploadAttempts < maxAttempts) {
+      const { error } = await supabase.storage
+        .from('audio-files')
+        .upload(filename, audioBlob, {
+          contentType: 'audio/mpeg',
+          upsert: false,
+          cacheControl: '3600'
+        });
+
+      if (!error) {
+        break;
+      }
+
+      uploadError = error;
+      uploadAttempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts)); // Exponential backoff
+    }
+
+    if (uploadAttempts === maxAttempts) {
+      console.error('Upload error:', uploadError);
+      throw new Error('Failed to upload audio file after multiple attempts');
+    }
 
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioContext = new AudioContext();
@@ -61,7 +81,10 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         emotion_scores: emotions
       });
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('Database error:', dbError);
+      throw new Error('Failed to save analysis results');
+    }
 
     return {
       speakerProfile: {
@@ -74,7 +97,9 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     };
   } catch (error) {
     console.error('Audio analysis error:', error);
-    throw error;
+    throw error instanceof Error 
+      ? error 
+      : new Error('An unexpected error occurred during audio analysis');
   }
 };
 
