@@ -90,7 +90,7 @@ export class EmotionAnalysisService {
     const total = Object.values(rawScores).reduce((sum, score) => sum + score, 0);
     
     // Normalize scores to percentages
-    const normalizedScores: Record<EmotionType, number> = {};
+    const normalizedScores: Record<EmotionType, number> = {} as Record<EmotionType, number>;
     for (const [emotion, score] of Object.entries(rawScores)) {
       normalizedScores[emotion as EmotionType] = (score / total) * 100;
     }
