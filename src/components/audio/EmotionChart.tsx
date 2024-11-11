@@ -22,6 +22,15 @@ const EmotionChart = ({ emotions }: EmotionChartProps) => {
     fearful: "😨"
   };
 
+  // Ensure values are properly normalized
+  const normalizedEmotions = { ...emotions };
+  const total = Object.values(emotions).reduce((sum, value) => sum + value, 0);
+  if (total !== 100) {
+    Object.keys(normalizedEmotions).forEach(key => {
+      normalizedEmotions[key] = (emotions[key] / total) * 100;
+    });
+  }
+
   return (
     <Card className="overflow-hidden">
       <CardHeader>
@@ -39,7 +48,7 @@ const EmotionChart = ({ emotions }: EmotionChartProps) => {
       <CardContent>
         <div className="grid grid-cols-5 gap-3">
           <AnimatePresence>
-            {Object.entries(emotions).map(([emotion, value], index) => (
+            {Object.entries(normalizedEmotions).map(([emotion, value], index) => (
               <motion.div
                 key={emotion}
                 initial={{ opacity: 0, y: 20 }}
@@ -52,7 +61,7 @@ const EmotionChart = ({ emotions }: EmotionChartProps) => {
                   <motion.div
                     className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${emotionColors[emotion as keyof typeof emotionColors]}`}
                     initial={{ height: 0 }}
-                    animate={{ height: `${value * 100}%` }}
+                    animate={{ height: `${value}%` }}
                     transition={{ 
                       type: "spring",
                       stiffness: 100,
@@ -83,7 +92,7 @@ const EmotionChart = ({ emotions }: EmotionChartProps) => {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.4 + index * 0.1 }}
                 >
-                  {(value * 100).toFixed(0)}%
+                  {value.toFixed(1)}%
                 </motion.p>
               </motion.div>
             ))}

@@ -1,6 +1,6 @@
-import { VoiceParameters, EmotionalState, EmotionType, EmotionAnalysisConfig } from '@/types/emotionAnalysis';
+import { VoiceParameters, EmotionalState, EmotionType } from '@/types/emotionAnalysis';
 
-const DEFAULT_CONFIG: EmotionAnalysisConfig = {
+const DEFAULT_CONFIG = {
   baselineQuality: 0.7,
   qualityThreshold: 0.2,
   minConfidence: 0.4,
@@ -14,9 +14,9 @@ export class EmotionAnalysisService {
   private baseline: VoiceParameters | null = null;
   private lastUpdate: number = 0;
   private emotionalHistory: EmotionalState[] = [];
-  private config: EmotionAnalysisConfig;
+  private config: typeof DEFAULT_CONFIG;
 
-  constructor(config: Partial<EmotionAnalysisConfig> = {}) {
+  constructor(config: Partial<typeof DEFAULT_CONFIG> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
@@ -26,7 +26,7 @@ export class EmotionAnalysisService {
     }
 
     const emotionalIndicators = this.calculateEmotionalIndicators(params);
-    const emotions = this.determineEmotions(emotionalIndicators);
+    const emotions = this.normalizeEmotions(this.determineEmotions(emotionalIndicators));
     
     const state: EmotionalState = {
       primary: emotions.primary,
@@ -51,65 +51,87 @@ export class EmotionAnalysisService {
     const emotionalDistress = params.clarity < 0.3 && params.stability < 0.3;
     
     const pitchDeviation = Math.abs(params.averagePitch - this.baseline!.averagePitch);
-    const energyLevel = params.energyLevel;
+    const normalizedPitch = this.normalizePitch(params.averagePitch);
     
     return {
       isStressed,
       emotionalIntensity,
       emotionalDistress,
       pitchDeviation,
-      energyLevel
+      normalizedPitch,
+      energyLevel: params.energyLevel
     };
   }
 
-  private determineEmotions(indicators: any): {
+  private normalizePitch(pitch: number): number {
+    const minPitch = 50;
+    const maxPitch = 1600;
+    return Math.max(0, Math.min(1, (Math.log(pitch) - Math.log(minPitch)) / (Math.log(maxPitch) - Math.log(minPitch))));
+  }
+
+  private determineEmotions(indicators: any): Record<EmotionType, number> {
+    const rawScores: Record<EmotionType, number> = {
+      neutral: this.calculateNeutralScore(indicators),
+      happy: this.calculateHappyScore(indicators),
+      sad: this.calculateSadScore(indicators),
+      angry: this.calculateAngryScore(indicators),
+      fearful: this.calculateFearfulScore(indicators)
+    };
+
+    return rawScores;
+  }
+
+  private normalizeEmotions(rawScores: Record<EmotionType, number>): {
     primary: EmotionType;
     secondary?: EmotionType;
     confidence: Record<EmotionType, number>;
   } {
-    const confidence: Record<EmotionType, number> = {
-      neutral: this.calculateNeutralConfidence(indicators),
-      happy: this.calculateHappyConfidence(indicators),
-      sad: this.calculateSadConfidence(indicators),
-      angry: this.calculateAngryConfidence(indicators),
-      fearful: this.calculateFearfulConfidence(indicators)
-    };
+    // Get the sum of all scores
+    const total = Object.values(rawScores).reduce((sum, score) => sum + score, 0);
+    
+    // Normalize scores to percentages
+    const normalizedScores: Record<EmotionType, number> = {};
+    for (const [emotion, score] of Object.entries(rawScores)) {
+      normalizedScores[emotion as EmotionType] = (score / total) * 100;
+    }
 
-    const sortedEmotions = Object.entries(confidence)
+    // Sort emotions by score
+    const sortedEmotions = Object.entries(normalizedScores)
       .sort(([, a], [, b]) => b - a);
 
-    const [primary, secondary] = sortedEmotions;
-
     return {
-      primary: primary[0] as EmotionType,
-      secondary: secondary[1] >= this.config.minConfidence ? secondary[0] as EmotionType : undefined,
-      confidence
+      primary: sortedEmotions[0][0] as EmotionType,
+      secondary: sortedEmotions[1][1] >= this.config.minConfidence ? sortedEmotions[1][0] as EmotionType : undefined,
+      confidence: normalizedScores
     };
   }
 
-  private calculateNeutralConfidence(indicators: any): number {
+  private calculateNeutralScore(indicators: any): number {
     return !indicators.isStressed && !indicators.emotionalIntensity ? 0.8 : 0.2;
   }
 
-  private calculateHappyConfidence(indicators: any): number {
-    return indicators.energyLevel > 0.8 && !indicators.emotionalDistress ? 0.7 : 0.1;
+  private calculateHappyScore(indicators: any): number {
+    const baseScore = indicators.energyLevel > 0.8 && !indicators.emotionalDistress ? 0.7 : 0.1;
+    return baseScore * (1 + indicators.normalizedPitch * 0.3);
   }
 
-  private calculateSadConfidence(indicators: any): number {
-    return indicators.energyLevel < 0.3 && indicators.emotionalDistress ? 0.7 : 0.1;
+  private calculateSadScore(indicators: any): number {
+    const baseScore = indicators.energyLevel < 0.3 && indicators.emotionalDistress ? 0.7 : 0.1;
+    return baseScore * (1 - indicators.normalizedPitch * 0.3);
   }
 
-  private calculateAngryConfidence(indicators: any): number {
-    return indicators.emotionalIntensity && indicators.energyLevel > 0.8 ? 0.8 : 0.1;
+  private calculateAngryScore(indicators: any): number {
+    const baseScore = indicators.emotionalIntensity && indicators.energyLevel > 0.8 ? 0.8 : 0.1;
+    return baseScore * (1 + indicators.normalizedPitch * 0.4);
   }
 
-  private calculateFearfulConfidence(indicators: any): number {
-    return indicators.emotionalDistress && indicators.isStressed ? 0.7 : 0.1;
+  private calculateFearfulScore(indicators: any): number {
+    const baseScore = indicators.emotionalDistress && indicators.isStressed ? 0.7 : 0.1;
+    return baseScore * (1 + indicators.pitchDeviation * 0.3);
   }
 
   private updateHistory(state: EmotionalState): void {
     this.emotionalHistory.push(state);
-    // Keep last 4 seconds of history (16 samples at 250ms intervals)
     if (this.emotionalHistory.length > 16) {
       this.emotionalHistory.shift();
     }
