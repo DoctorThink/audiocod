@@ -1,62 +1,38 @@
 import * as tf from '@tensorflow/tfjs';
-import { createEmotionModel, trainModel, predictEmotion, trainingData } from './emotionModel';
+import { EmotionAnalysisService } from './emotionAnalysisService';
+import { VoiceParameters } from '@/types/emotionAnalysis';
 
-let emotionModel: tf.Sequential | null = null;
-
-const initializeModel = async () => {
-  if (!emotionModel) {
-    emotionModel = createEmotionModel();
-    await trainModel(emotionModel, trainingData.features, trainingData.labels);
-  }
-  return emotionModel;
-};
+const emotionAnalysisService = new EmotionAnalysisService();
 
 export const calculateEmotions = async (
   timeSeriesData: Array<{ time: number; pitch: number; energy: number }>,
   spectralFeatures: Float32Array
 ) => {
-  // Initialize and ensure model is trained
-  const model = await initializeModel();
+  // Extract voice parameters from the data
+  const voiceParams = extractVoiceParameters(timeSeriesData);
   
-  // Extract relevant features from the audio data
-  const features = extractFeatures(timeSeriesData, spectralFeatures);
+  // Analyze emotions using our service
+  const emotionalState = emotionAnalysisService.analyzeVoiceParameters(voiceParams);
   
-  // Get emotion predictions
-  const emotions = await predictEmotion(model, features);
-  
-  return emotions;
+  return emotionalState.confidence;
 };
 
-const extractFeatures = (
-  timeSeriesData: Array<{ time: number; pitch: number; energy: number }>,
-  spectralFeatures: Float32Array
-): number[] => {
-  // Calculate statistical features from time series data
+const extractVoiceParameters = (
+  timeSeriesData: Array<{ time: number; pitch: number; energy: number }>
+): VoiceParameters => {
   const pitches = timeSeriesData.map(d => d.pitch);
   const energies = timeSeriesData.map(d => d.energy);
   
-  const features = [
-    // Pitch features
-    mean(pitches),
-    std(pitches),
-    Math.max(...pitches),
-    Math.min(...pitches),
-    
-    // Energy features
-    mean(energies),
-    std(energies),
-    Math.max(...energies),
-    Math.min(...energies),
-    
-    // Rate of change features
-    calculateRateOfChange(pitches),
-    calculateRateOfChange(energies),
-    
-    // Spectral features (first 30 coefficients)
-    ...Array.from(spectralFeatures.slice(0, 30))
-  ];
-  
-  return features;
+  return {
+    voiceQuality: calculateVoiceQuality(timeSeriesData),
+    clarity: calculateClarity(timeSeriesData),
+    stability: calculateStability(timeSeriesData),
+    averagePitch: mean(pitches),
+    pitchRange: [Math.min(...pitches), Math.max(...pitches)],
+    energyLevel: mean(energies),
+    timeSeriesPitch: pitches,
+    timeSeriesEnergy: energies
+  };
 };
 
 // Helper functions
@@ -70,10 +46,22 @@ function std(arr: number[]): number {
   return Math.sqrt(mean(squareDiffs));
 }
 
-function calculateRateOfChange(arr: number[]): number {
-  let changes = 0;
-  for (let i = 1; i < arr.length; i++) {
-    changes += Math.abs(arr[i] - arr[i - 1]);
-  }
-  return changes / (arr.length - 1);
+function calculateVoiceQuality(data: Array<{ time: number; pitch: number; energy: number }>): number {
+  const energies = data.map(d => d.energy);
+  const pitches = data.map(d => d.pitch);
+  
+  const energyStability = 1 - std(energies);
+  const pitchStability = 1 - std(pitches) / mean(pitches);
+  
+  return (energyStability + pitchStability) / 2;
+}
+
+function calculateClarity(data: Array<{ time: number; pitch: number; energy: number }>): number {
+  const energies = data.map(d => d.energy);
+  return mean(energies);
+}
+
+function calculateStability(data: Array<{ time: number; pitch: number; energy: number }>): number {
+  const pitches = data.map(d => d.pitch);
+  return 1 - (std(pitches) / mean(pitches));
 }
