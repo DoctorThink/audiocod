@@ -37,14 +37,14 @@ const extractFeatures = (
   
   const features = [
     // Pitch features
-    Math.mean(pitches),
-    Math.std(pitches),
+    mean(pitches),
+    std(pitches),
     Math.max(...pitches),
     Math.min(...pitches),
     
     // Energy features
-    Math.mean(energies),
-    Math.std(energies),
+    mean(energies),
+    std(energies),
     Math.max(...energies),
     Math.min(...energies),
     
@@ -60,14 +60,14 @@ const extractFeatures = (
 };
 
 // Helper functions
-function Math.mean(arr: number[]): number {
+function mean(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-function Math.std(arr: number[]): number {
-  const mean = Math.mean(arr);
-  const squareDiffs = arr.map(value => Math.pow(value - mean, 2));
-  return Math.sqrt(Math.mean(squareDiffs));
+function std(arr: number[]): number {
+  const meanValue = mean(arr);
+  const squareDiffs = arr.map(value => Math.pow(value - meanValue, 2));
+  return Math.sqrt(mean(squareDiffs));
 }
 
 function calculateRateOfChange(arr: number[]): number {
