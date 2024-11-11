@@ -1,4 +1,4 @@
-import { Upload, Waveform } from "lucide-react";
+import { Upload, AudioWaveform } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AudioUploaderProps {
@@ -28,7 +28,7 @@ const AudioUploader = ({ file, onFileUpload }: AudioUploaderProps) => {
           animate={{ opacity: 1, scale: 1 }}
           className="flex items-center gap-3"
         >
-          <Waveform className="w-8 h-8 text-primary-500" />
+          <AudioWaveform className="w-8 h-8 text-primary-500" />
           <span className="text-primary-600 font-medium">{file.name}</span>
         </motion.div>
       )}

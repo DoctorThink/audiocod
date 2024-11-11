@@ -106,7 +106,7 @@ async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
       const spectrogram = await spectrogramTensor.array();
       
       // Calculate average spectral features
-      const numFrames = spectrogram.length;
+      const numFrames = Array.isArray(spectrogram) ? spectrogram.length : 0;
       for (let i = 0; i < 40; i++) {
         let sum = 0;
         for (let j = 0; j < numFrames; j++) {
