@@ -1,154 +1,79 @@
 import * as tf from '@tensorflow/tfjs';
+import { createEmotionModel, trainModel, predictEmotion, trainingData } from './emotionModel';
 
-interface EmotionScores {
-  neutral: number;
-  happy: number;
-  sad: number;
-  angry: number;
-  fearful: number;
-}
+let emotionModel: tf.Sequential | null = null;
 
-// Emotion detection rules based on audio characteristics
-const EMOTION_RULES = {
-  happy: {
-    pitchRange: [200, 400],
-    energyThreshold: 0.6,
-    tempoRange: [120, 180],
-    spectralCentroidRange: [2000, 4000]
-  },
-  sad: {
-    pitchRange: [100, 250],
-    energyThreshold: 0.3,
-    tempoRange: [60, 90],
-    spectralCentroidRange: [500, 1500]
-  },
-  angry: {
-    pitchRange: [150, 350],
-    energyThreshold: 0.8,
-    tempoRange: [140, 200],
-    spectralCentroidRange: [3000, 5000]
-  },
-  fearful: {
-    pitchRange: [200, 300],
-    energyThreshold: 0.4,
-    tempoRange: [100, 160],
-    spectralCentroidRange: [1500, 3000]
+const initializeModel = async () => {
+  if (!emotionModel) {
+    emotionModel = createEmotionModel();
+    await trainModel(emotionModel, trainingData.features, trainingData.labels);
   }
+  return emotionModel;
 };
 
-function calculateSpectralCentroid(spectralFeatures: Float32Array): number {
-  let weightedSum = 0;
-  let sum = 0;
-  
-  for (let i = 0; i < spectralFeatures.length; i++) {
-    weightedSum += i * spectralFeatures[i];
-    sum += spectralFeatures[i];
-  }
-  
-  return sum === 0 ? 0 : weightedSum / sum;
-}
-
-function calculateTempo(timeSeriesData: Array<{ energy: number }>): number {
-  const energies = timeSeriesData.map(d => d.energy);
-  const correlations = new Float32Array(energies.length);
-  
-  // Auto-correlation to find tempo
-  for (let lag = 0; lag < energies.length; lag++) {
-    let sum = 0;
-    for (let i = 0; i < energies.length - lag; i++) {
-      sum += energies[i] * energies[i + lag];
-    }
-    correlations[lag] = sum;
-  }
-  
-  // Find peaks in correlations
-  const peaks = [];
-  for (let i = 1; i < correlations.length - 1; i++) {
-    if (correlations[i] > correlations[i - 1] && correlations[i] > correlations[i + 1]) {
-      peaks.push(i);
-    }
-  }
-  
-  // Calculate tempo from peak intervals
-  const averageInterval = peaks.length > 1 
-    ? (peaks[peaks.length - 1] - peaks[0]) / (peaks.length - 1)
-    : 0;
-  
-  return averageInterval === 0 ? 120 : 60 / (averageInterval * 0.023); // Convert to BPM
-}
-
-function getEmotionScore(
-  value: number,
-  range: [number, number],
-  inverse: boolean = false
-): number {
-  const normalized = (value - range[0]) / (range[1] - range[0]);
-  const score = Math.max(0, Math.min(1, normalized));
-  return inverse ? 1 - score : score;
-}
-
-export function calculateEmotions(
-  timeSeriesData: Array<{ pitch: number; energy: number }>,
+export const calculateEmotions = async (
+  timeSeriesData: Array<{ time: number; pitch: number; energy: number }>,
   spectralFeatures: Float32Array
-): EmotionScores {
-  if (!timeSeriesData.length) {
-    return {
-      neutral: 0.2,
-      happy: 0.2,
-      sad: 0.2,
-      angry: 0.2,
-      fearful: 0.2
-    };
-  }
+) => {
+  // Initialize and ensure model is trained
+  const model = await initializeModel();
+  
+  // Extract relevant features from the audio data
+  const features = extractFeatures(timeSeriesData, spectralFeatures);
+  
+  // Get emotion predictions
+  const emotions = await predictEmotion(model, features);
+  
+  return emotions;
+};
 
+const extractFeatures = (
+  timeSeriesData: Array<{ time: number; pitch: number; energy: number }>,
+  spectralFeatures: Float32Array
+): number[] => {
+  // Calculate statistical features from time series data
   const pitches = timeSeriesData.map(d => d.pitch);
-  const avgPitch = pitches.reduce((a, b) => a + b, 0) / pitches.length;
-  const avgEnergy = timeSeriesData.reduce((a, b) => a + b.energy, 0) / timeSeriesData.length;
-  const tempo = calculateTempo(timeSeriesData);
-  const spectralCentroid = calculateSpectralCentroid(spectralFeatures);
+  const energies = timeSeriesData.map(d => d.energy);
+  
+  const features = [
+    // Pitch features
+    Math.mean(pitches),
+    Math.std(pitches),
+    Math.max(...pitches),
+    Math.min(...pitches),
+    
+    // Energy features
+    Math.mean(energies),
+    Math.std(energies),
+    Math.max(...energies),
+    Math.min(...energies),
+    
+    // Rate of change features
+    calculateRateOfChange(pitches),
+    calculateRateOfChange(energies),
+    
+    // Spectral features (first 30 coefficients)
+    ...Array.from(spectralFeatures.slice(0, 30))
+  ];
+  
+  return features;
+};
 
-  // Calculate individual emotion scores
-  const scores = {
-    happy: (
-      getEmotionScore(avgPitch, EMOTION_RULES.happy.pitchRange) * 0.3 +
-      getEmotionScore(avgEnergy, [0, EMOTION_RULES.happy.energyThreshold]) * 0.3 +
-      getEmotionScore(tempo, EMOTION_RULES.happy.tempoRange) * 0.2 +
-      getEmotionScore(spectralCentroid, EMOTION_RULES.happy.spectralCentroidRange) * 0.2
-    ),
-    sad: (
-      getEmotionScore(avgPitch, EMOTION_RULES.sad.pitchRange, true) * 0.3 +
-      getEmotionScore(avgEnergy, [0, EMOTION_RULES.sad.energyThreshold], true) * 0.3 +
-      getEmotionScore(tempo, EMOTION_RULES.sad.tempoRange, true) * 0.2 +
-      getEmotionScore(spectralCentroid, EMOTION_RULES.sad.spectralCentroidRange) * 0.2
-    ),
-    angry: (
-      getEmotionScore(avgPitch, EMOTION_RULES.angry.pitchRange) * 0.25 +
-      getEmotionScore(avgEnergy, [0, EMOTION_RULES.angry.energyThreshold]) * 0.35 +
-      getEmotionScore(tempo, EMOTION_RULES.angry.tempoRange) * 0.2 +
-      getEmotionScore(spectralCentroid, EMOTION_RULES.angry.spectralCentroidRange) * 0.2
-    ),
-    fearful: (
-      getEmotionScore(avgPitch, EMOTION_RULES.fearful.pitchRange) * 0.3 +
-      getEmotionScore(avgEnergy, [0, EMOTION_RULES.fearful.energyThreshold]) * 0.25 +
-      getEmotionScore(tempo, EMOTION_RULES.fearful.tempoRange) * 0.25 +
-      getEmotionScore(spectralCentroid, EMOTION_RULES.fearful.spectralCentroidRange) * 0.2
-    )
-  };
+// Helper functions
+function Math.mean(arr: number[]): number {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
 
-  // Calculate neutral score based on how close to average all other emotions are
-  const emotionValues = Object.values(scores);
-  const avgEmotionScore = emotionValues.reduce((a, b) => a + b, 0) / emotionValues.length;
-  const emotionVariance = emotionValues.reduce((a, b) => a + Math.pow(b - avgEmotionScore, 2), 0) / emotionValues.length;
-  const neutral = Math.max(0.1, 1 - emotionVariance);
+function Math.std(arr: number[]): number {
+  const mean = Math.mean(arr);
+  const squareDiffs = arr.map(value => Math.pow(value - mean, 2));
+  return Math.sqrt(Math.mean(squareDiffs));
+}
 
-  // Normalize scores
-  const total = neutral + Object.values(scores).reduce((a, b) => a + b, 0);
-
-  return {
-    neutral: Number((neutral / total).toFixed(3)),
-    happy: Number((scores.happy / total).toFixed(3)),
-    sad: Number((scores.sad / total).toFixed(3)),
-    angry: Number((scores.angry / total).toFixed(3)),
-    fearful: Number((scores.fearful / total).toFixed(3))
-  };
+function calculateRateOfChange(arr: number[]): number {
+  let changes = 0;
+  for (let i = 1; i < arr.length; i++) {
+    changes += Math.abs(arr[i] - arr[i - 1]);
+  }
+  return changes / (arr.length - 1);
 }

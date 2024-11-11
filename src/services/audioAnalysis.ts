@@ -24,6 +24,60 @@ export interface AnalysisResult {
   transcription?: string;
 }
 
+export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => {
+  if (audioBlob.size > 10 * 1024 * 1024) {
+    throw new Error('File size exceeds 10MB limit');
+  }
+
+  try {
+    const filename = `${crypto.randomUUID()}.mp3`;
+    const { error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(filename, audioBlob, {
+        contentType: 'audio/mpeg',
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    const { timeSeriesData, spectralFeatures } = await processAudioFeatures(audioBuffer);
+    
+    // Use the new ML-based emotion detection
+    const emotions = await calculateEmotions(timeSeriesData, spectralFeatures);
+    const characteristics = calculateVoiceCharacteristics(timeSeriesData);
+
+    const { error: dbError } = await supabase
+      .from('audio_analyses')
+      .insert({
+        file_path: filename,
+        pitch_mean: characteristics.pitchMean,
+        pitch_range: characteristics.pitchRange,
+        energy_level: timeSeriesData.reduce((acc, curr) => acc + curr.energy, 0) / timeSeriesData.length,
+        spectral_features: Array.from(spectralFeatures),
+        emotion_scores: emotions
+      });
+
+    if (dbError) throw dbError;
+
+    return {
+      speakerProfile: {
+        id: crypto.randomUUID(),
+        confidence: characteristics.stability,
+        characteristics
+      },
+      emotions,
+      timeSeriesData
+    };
+  } catch (error) {
+    console.error('Audio analysis error:', error);
+    throw error;
+  }
+};
+
 async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
   timeSeriesData: Array<{ time: number; pitch: number; energy: number }>;
   spectralFeatures: Float32Array;
@@ -108,57 +162,3 @@ async function processAudioFeatures(audioBuffer: AudioBuffer): Promise<{
     }
   });
 }
-
-export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => {
-  if (audioBlob.size > 10 * 1024 * 1024) {
-    throw new Error('File size exceeds 10MB limit');
-  }
-
-  try {
-    const filename = `${crypto.randomUUID()}.mp3`;
-    const { error: uploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(filename, audioBlob, {
-        contentType: 'audio/mpeg',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioContext = new AudioContext();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    const { timeSeriesData, spectralFeatures } = await processAudioFeatures(audioBuffer);
-    
-    // Use spectral features for emotion detection
-    const emotions = calculateEmotions(timeSeriesData, spectralFeatures);
-    const characteristics = calculateVoiceCharacteristics(timeSeriesData);
-
-    const { error: dbError } = await supabase
-      .from('audio_analyses')
-      .insert({
-        file_path: filename,
-        pitch_mean: characteristics.pitchMean,
-        pitch_range: characteristics.pitchRange,
-        energy_level: timeSeriesData.reduce((acc, curr) => acc + curr.energy, 0) / timeSeriesData.length,
-        spectral_features: Array.from(spectralFeatures),
-        emotion_scores: emotions
-      });
-
-    if (dbError) throw dbError;
-
-    return {
-      speakerProfile: {
-        id: crypto.randomUUID(),
-        confidence: characteristics.stability,
-        characteristics
-      },
-      emotions,
-      timeSeriesData
-    };
-  } catch (error) {
-    console.error('Audio analysis error:', error);
-    throw error;
-  }
-};
