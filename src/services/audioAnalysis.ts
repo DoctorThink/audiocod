@@ -3,6 +3,9 @@ import * as tf from '@tensorflow/tfjs';
 import { calculateEmotions } from "./audio/emotionAnalysis";
 import { calculateVoiceCharacteristics } from "./audio/voiceCharacteristics";
 import { emotionClassifier } from "./audio/emotionClassifier";
+import type { VoiceCharacteristics } from "./audio/voiceCharacteristics";
+import type { EmotionPrediction } from "./audio/emotionClassifier";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface AnalysisResult {
   speakerProfile: {
@@ -10,13 +13,7 @@ export interface AnalysisResult {
     confidence: number;
     characteristics: VoiceCharacteristics;
   };
-  emotions: {
-    neutral: number;
-    happy: number;
-    sad: number;
-    angry: number;
-    fearful: number;
-  };
+  emotions: EmotionPrediction;
   timeSeriesData: Array<{
     time: number;
     pitch: number;
@@ -74,6 +71,15 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     const emotions = await calculateEmotions(timeSeriesData, spectralFeatures);
     const characteristics = calculateVoiceCharacteristics(timeSeriesData);
 
+    // Convert emotions to a JSON-compatible object
+    const emotionScores: Json = {
+      neutral: emotions.neutral,
+      happy: emotions.happy,
+      sad: emotions.sad,
+      angry: emotions.angry,
+      fearful: emotions.fearful
+    };
+
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
@@ -82,7 +88,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         pitch_range: characteristics.pitchRange,
         energy_level: timeSeriesData.reduce((acc, curr) => acc + curr.energy, 0) / timeSeriesData.length,
         spectral_features: Array.from(spectralFeatures),
-        emotion_scores: emotions
+        emotion_scores: emotionScores
       });
 
     if (dbError) {
