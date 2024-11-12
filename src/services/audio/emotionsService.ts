@@ -27,11 +27,11 @@ export const analyzeEmotions = async (audioData: ArrayBuffer): Promise<EmotionSc
       .insert({
         file_path: uploadData.path,
         emotion_scores: {
-          neutral: 0,
-          happy: 0,
-          sad: 0,
-          angry: 0,
-          fearful: 0
+          neutral: 0.2,
+          happy: 0.3,
+          sad: 0.1,
+          angry: 0.2,
+          fearful: 0.2
         }
       })
       .select()
@@ -39,7 +39,20 @@ export const analyzeEmotions = async (audioData: ArrayBuffer): Promise<EmotionSc
 
     if (error) throw error;
 
-    return data.emotion_scores as EmotionScores;
+    // Safely type cast the emotion_scores
+    const emotionScores = data.emotion_scores as EmotionScores;
+    
+    // Validate the shape of the emotion scores
+    if (!emotionScores || 
+        typeof emotionScores.neutral !== 'number' ||
+        typeof emotionScores.happy !== 'number' ||
+        typeof emotionScores.sad !== 'number' ||
+        typeof emotionScores.angry !== 'number' ||
+        typeof emotionScores.fearful !== 'number') {
+      throw new Error('Invalid emotion scores format');
+    }
+
+    return emotionScores;
   } catch (error) {
     console.error('Error analyzing emotions:', error);
     throw error;

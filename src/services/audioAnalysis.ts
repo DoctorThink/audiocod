@@ -22,6 +22,8 @@ export interface AnalysisResult {
       pitchMean: number;
       pitchRange: [number, number];
       voiceQuality: number;
+      clarity: number;
+      stability: number;
     };
   };
 }
@@ -46,8 +48,10 @@ export const analyzeAudio = async (file: File | Blob): Promise<AnalysisResult> =
         confidence: 0.89,
         characteristics: {
           pitchMean: 165,
-          pitchRange: [120, 210],
-          voiceQuality: 0.85
+          pitchRange: [120, 210] as [number, number],
+          voiceQuality: 0.85,
+          clarity: 0.78,
+          stability: 0.92
         }
       }
     };
