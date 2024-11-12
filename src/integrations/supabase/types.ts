@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       audio_analyses: {
         Row: {
+          content: string | null
           created_at: string | null
           emotion_scores: Json | null
           energy_level: number | null
@@ -23,6 +24,7 @@ export type Database = {
           transcription: string | null
         }
         Insert: {
+          content?: string | null
           created_at?: string | null
           emotion_scores?: Json | null
           energy_level?: number | null
@@ -35,6 +37,7 @@ export type Database = {
           transcription?: string | null
         }
         Update: {
+          content?: string | null
           created_at?: string | null
           emotion_scores?: Json | null
           energy_level?: number | null
