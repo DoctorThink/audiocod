@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
+import type { EmotionPrediction } from "@/services/audio/emotionClassifier";
 
 interface EmotionChartProps {
-  emotions: Record<string, number>;
+  emotions: EmotionPrediction;
 }
 
 const EmotionChart = ({ emotions }: EmotionChartProps) => {
@@ -22,14 +23,12 @@ const EmotionChart = ({ emotions }: EmotionChartProps) => {
     fearful: "😨"
   };
 
-  // Ensure values are properly normalized
-  const normalizedEmotions = { ...emotions };
+  // Convert emotions to percentage values
   const total = Object.values(emotions).reduce((sum, value) => sum + value, 0);
-  if (total !== 100) {
-    Object.keys(normalizedEmotions).forEach(key => {
-      normalizedEmotions[key] = (emotions[key] / total) * 100;
-    });
-  }
+  const normalizedEmotions = Object.entries(emotions).reduce((acc, [key, value]) => {
+    acc[key] = (value / total) * 100;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <Card className="overflow-hidden">
