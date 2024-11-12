@@ -5,9 +5,10 @@ import { toast } from "@/components/ui/use-toast";
 
 interface AudioRecorderProps {
   onRecordingComplete: (blob: Blob) => void;
+  onRecordingStart?: () => void;
 }
 
-const AudioRecorder = ({ onRecordingComplete }: AudioRecorderProps) => {
+const AudioRecorder = ({ onRecordingComplete, onRecordingStart }: AudioRecorderProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
@@ -29,6 +30,7 @@ const AudioRecorder = ({ onRecordingComplete }: AudioRecorderProps) => {
 
       mediaRecorder.current.start();
       setIsRecording(true);
+      onRecordingStart?.();
     } catch (error) {
       console.error('Error accessing microphone:', error);
       toast({
@@ -37,7 +39,7 @@ const AudioRecorder = ({ onRecordingComplete }: AudioRecorderProps) => {
         description: "Could not access microphone. Please check permissions.",
       });
     }
-  }, [onRecordingComplete]);
+  }, [onRecordingComplete, onRecordingStart]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorder.current && isRecording) {
