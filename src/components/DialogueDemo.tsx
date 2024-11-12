@@ -179,21 +179,10 @@ const DialogueDemo = () => {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <AnalysisResults results={analysisResults} />
-                <motion.div 
-                  className="mt-8 text-center"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <Button
-                    onClick={resetAnalysis}
-                    className="bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Record Again
-                  </Button>
-                </motion.div>
+                <AnalysisResults 
+                  results={analysisResults} 
+                  onReset={resetAnalysis}
+                />
               </motion.div>
             )}
           </AnimatePresence>
