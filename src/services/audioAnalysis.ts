@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import * as tf from '@tensorflow/tfjs';
 import { calculateEmotions } from "./audio/emotionAnalysis";
-import { calculateVoiceCharacteristics, type VoiceCharacteristics } from "./audio/voiceCharacteristics";
+import { calculateVoiceCharacteristics } from "./audio/voiceCharacteristics";
+import { emotionClassifier } from "./audio/emotionClassifier";
 
 export interface AnalysisResult {
   speakerProfile: {
@@ -30,6 +31,9 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
   }
 
   try {
+    // Initialize emotion classifier
+    await emotionClassifier.initialize();
+
     const filename = `${crypto.randomUUID()}.mp3`;
     
     // Upload with retry logic
@@ -66,7 +70,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     
     const { timeSeriesData, spectralFeatures } = await processAudioFeatures(audioBuffer);
     
-    // Use the new ML-based emotion detection
+    // Use our new emotion analysis
     const emotions = await calculateEmotions(timeSeriesData, spectralFeatures);
     const characteristics = calculateVoiceCharacteristics(timeSeriesData);
 
