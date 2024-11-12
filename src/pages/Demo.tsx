@@ -1,46 +1,69 @@
-import { useState } from "react";
-import { Activity, Loader2, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
-import AudioRecorder from "@/components/audio/AudioRecorder";
-import EmotionChart from "@/components/audio/EmotionChart";
-import VoiceMetrics from "@/components/audio/VoiceMetrics";
 import { analyzeAudio } from "@/services/audioAnalysis";
-import VoiceVisualizer from "@/components/demo/VoiceVisualizer";
-import Seismograph from "@/components/demo/Seismograph";
-import RecordingStatus from "@/components/demo/RecordingStatus";
+import RecordingPage from "@/components/demo/RecordingPage";
+import AnalysisResults from "@/components/demo/AnalysisResults";
+import AnalysisProgress from "@/components/demo/AnalysisProgress";
 
 const Demo = () => {
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStage, setAnalysisStage] = useState("");
+  const [timeElapsed, setTimeElapsed] = useState(0);
   const { toast } = useToast();
 
   const { data: analysisResults, refetch: runAnalysis, isLoading } = useQuery({
     queryKey: ['audioAnalysis'],
     queryFn: async () => {
-      if (!audioBlob) throw new Error('No audio recorded');
-      return analyzeAudio(audioBlob);
+      if (!audioFile) throw new Error('No audio recorded');
+      return analyzeAudio(audioFile);
     },
     enabled: false
   });
 
-  const handleRecordingComplete = (blob: Blob) => {
-    setAudioBlob(blob);
-    setAudioUrl(URL.createObjectURL(blob));
-    setIsRecording(false);
-    toast({
-      title: "Recording complete",
-      description: "You can now analyze the audio.",
-    });
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoading) {
+      const startTime = Date.now();
+      timer = setInterval(() => {
+        setTimeElapsed((Date.now() - startTime) / 1000);
+        // Simulate progress stages
+        setAnalysisProgress(prev => {
+          if (prev < 95) {
+            const newProgress = prev + (100 - prev) * 0.1;
+            if (newProgress < 30) setAnalysisStage("Processing audio...");
+            else if (newProgress < 60) setAnalysisStage("Analyzing patterns...");
+            else if (newProgress < 90) setAnalysisStage("Generating insights...");
+            return newProgress;
+          }
+          return prev;
+        });
+      }, 100);
+    } else {
+      setAnalysisProgress(100);
+      setAnalysisStage("Analysis complete!");
+    }
+    return () => clearInterval(timer);
+  }, [isLoading]);
+
+  const handleAnalysisStart = async (file: File) => {
+    setAudioFile(file);
+    setAnalysisProgress(0);
+    setTimeElapsed(0);
+    setAnalysisStage("Initializing analysis...");
+    await runAnalysis();
   };
 
-  const handleRecordingStart = () => {
-    setIsRecording(true);
+  const resetAnalysis = () => {
+    setAudioFile(null);
+    setAnalysisProgress(0);
+    setTimeElapsed(0);
+    setAnalysisStage("");
   };
 
   return (
@@ -51,8 +74,8 @@ const Demo = () => {
       className="min-h-screen bg-gradient-to-b from-primary-50 via-white to-primary-50"
     >
       <div className="container py-8 space-y-8 px-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <Link to="/" className="self-start">
+        <div className="flex items-center justify-between">
+          <Link to="/">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -60,99 +83,32 @@ const Demo = () => {
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800">
             Voice DNA Analysis
           </h1>
-          <div className="flex gap-4 w-full sm:w-auto">
-            <AudioRecorder 
-              onRecordingComplete={handleRecordingComplete}
-              onRecordingStart={handleRecordingStart}
+          <div className="w-10" /> {/* Spacer for alignment */}
+        </div>
+
+        <AnimatePresence mode="wait">
+          {!audioFile && (
+            <RecordingPage 
+              onAnalysisStart={handleAnalysisStart}
+              isAnalyzing={isLoading}
             />
-            {audioBlob && (
-              <Button 
-                onClick={() => runAnalysis()}
-                disabled={isLoading}
-                className="w-full sm:w-auto bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Activity className="mr-2 h-4 w-4" />
-                    Analyze Audio
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
+          )}
+          
+          {audioFile && isLoading && (
+            <AnalysisProgress 
+              progress={analysisProgress}
+              stage={analysisStage}
+              timeElapsed={timeElapsed}
+            />
+          )}
 
-        <div className="relative">
-          <RecordingStatus isRecording={isRecording} />
-          <VoiceVisualizer isRecording={isRecording} />
-        </div>
-
-        {audioUrl && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full"
-          >
-            <Card className="backdrop-blur-sm bg-white/80 border-primary-100">
-              <CardHeader>
-                <CardTitle>Recorded Audio</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <audio controls className="w-full">
-                  <source src={audioUrl} type="audio/wav" />
-                  Your browser does not support the audio element.
-                </audio>
-                {analysisResults?.timeSeriesData && (
-                  <Seismograph 
-                    data={analysisResults.timeSeriesData.map(d => d.energy)} 
-                    height={150}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {analysisResults && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="space-y-8 animate-fade-in"
-          >
-            <Card className="backdrop-blur-sm bg-white/80 border-primary-100">
-              <CardHeader>
-                <CardTitle>Transcription</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-lg font-medium text-primary-900">{analysisResults.transcription}</p>
-              </CardContent>
-            </Card>
-
-            <div className="grid md:grid-cols-2 gap-8">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
-                <VoiceMetrics speakerProfile={analysisResults.speakerProfile} />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-              >
-                <EmotionChart emotions={analysisResults.emotions} />
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
+          {analysisResults && !isLoading && (
+            <AnalysisResults 
+              results={analysisResults}
+              onReset={resetAnalysis}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
