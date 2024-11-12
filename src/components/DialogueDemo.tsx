@@ -76,16 +76,16 @@ const DialogueDemo = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 via-white to-primary-50">
-      <div className="container mx-auto px-4 py-20">
+      <div className="container mx-auto px-4 py-8 sm:py-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="max-w-4xl mx-auto"
         >
-          <div className="text-center mb-12">
+          <div className="text-center mb-8 sm:mb-12">
             <motion.h2 
-              className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800 mb-4"
+              className="text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800 mb-3 sm:mb-4"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
@@ -93,7 +93,7 @@ const DialogueDemo = () => {
               Voice Analysis
             </motion.h2>
             <motion.p 
-              className="text-xl text-gray-600"
+              className="text-lg sm:text-xl text-gray-600"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
@@ -112,17 +112,19 @@ const DialogueDemo = () => {
                 transition={{ duration: 0.3 }}
               >
                 <Card className="backdrop-blur-sm bg-white/80 border-primary-100 shadow-lg">
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col items-center gap-6">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex flex-col items-center gap-4 sm:gap-6">
                       {!file ? (
                         <div className="w-full space-y-4">
                           <label 
                             htmlFor="audio-upload"
-                            className="block w-full p-8 border-2 border-dashed border-primary-200 rounded-xl cursor-pointer hover:border-primary-400 transition-colors bg-primary-50/30"
+                            className="block w-full p-4 sm:p-8 border-2 border-dashed border-primary-200 rounded-xl cursor-pointer hover:border-primary-400 transition-colors bg-primary-50/30"
                           >
                             <div className="flex flex-col items-center">
-                              <Upload className="w-12 h-12 text-primary-400 mb-2" />
-                              <span className="text-sm text-primary-600 font-medium">Drop MP3 file here or click to upload</span>
+                              <Upload className="w-8 sm:w-12 h-8 sm:h-12 text-primary-400 mb-2" />
+                              <span className="text-sm sm:text-base text-primary-600 font-medium text-center">
+                                Drop MP3 file here or tap to upload
+                              </span>
                               <span className="text-xs text-gray-500 mt-1">Maximum file size: 5MB</span>
                             </div>
                             <input
@@ -135,32 +137,32 @@ const DialogueDemo = () => {
                           </label>
                           <div className="text-center text-gray-500">or</div>
                           <Button 
-                            className="w-full bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md"
+                            className="w-full py-6 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md text-lg"
                             onClick={() => {/* Add recording logic */}}
                           >
-                            <Mic className="w-4 h-4 mr-2" />
+                            <Mic className="w-5 h-5 mr-2" />
                             Record Audio
                           </Button>
                         </div>
                       ) : (
-                        <div className="w-full space-y-6">
+                        <div className="w-full space-y-4 sm:space-y-6">
                           <AudioPlayer 
                             isPlaying={isPlaying} 
                             onPlayPause={() => setIsPlaying(!isPlaying)} 
                           />
                           <Button 
-                            className="w-full bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md"
+                            className="w-full py-4 sm:py-6 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md text-base sm:text-lg"
                             onClick={handleAnalysis}
                             disabled={isAnalyzing}
                           >
                             {isAnalyzing ? (
                               <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                                 Processing Audio...
                               </>
                             ) : (
                               <>
-                                <Mic className="w-4 h-4 mr-2" />
+                                <Mic className="w-5 h-5 mr-2" />
                                 Start Analysis
                               </>
                             )}
@@ -178,9 +180,10 @@ const DialogueDemo = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
+                className="w-full"
               >
                 <AnalysisResults 
-                  results={analysisResults} 
+                  results={analysisResults}
                   onReset={resetAnalysis}
                 />
               </motion.div>
