@@ -6,7 +6,7 @@ import { analyzeAudio } from "@/services/audioAnalysis";
 import { Card, CardContent } from "./ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import AudioPlayer from "./demo/AudioPlayer";
-import EmotionDisplay from "./audio/EmotionDisplay";
+import AnalysisResults from "./demo/AnalysisResults";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
 
@@ -178,9 +178,8 @@ const DialogueDemo = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="space-y-6"
               >
-                <EmotionDisplay emotions={analysisResults.emotions} />
+                <AnalysisResults results={analysisResults} />
                 <motion.div 
                   className="mt-8 text-center"
                   initial={{ opacity: 0 }}
