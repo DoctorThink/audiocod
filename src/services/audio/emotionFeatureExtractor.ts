@@ -23,7 +23,9 @@ export const extractAudioFeatures = async (
   }
   
   // Convert frames to tensor for spectral analysis
-  const frameTensor = tf.tensor2d(frames);
+  // Convert Float32Array[] to number[][] for tensor creation
+  const frameArray = frames.map(frame => Array.from(frame));
+  const frameTensor = tf.tensor2d(frameArray);
   const spectrogramTensor = tf.abs(tf.spectral.rfft(frameTensor));
   const spectrogram = await spectrogramTensor.array();
   
