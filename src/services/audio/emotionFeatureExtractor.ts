@@ -5,33 +5,46 @@ export interface AudioFeatures {
   energy: number[];
   spectralFeatures: Float32Array;
   tempo: number;
+  mfcc?: number[][];
+  zeroCrossings?: number[];
 }
 
 export const extractAudioFeatures = async (
   audioData: Float32Array,
   sampleRate: number
 ): Promise<AudioFeatures> => {
+  // Frame the audio data
   const frameSize = 2048;
   const hopSize = 512;
-  const frames = [];
+  const frames: Float32Array[] = [];
   
-  // Frame the audio data
   for (let i = 0; i < audioData.length - frameSize; i += hopSize) {
     frames.push(audioData.slice(i, i + frameSize));
   }
   
-  // Convert frames to tensor
+  // Convert frames to tensor for spectral analysis
   const frameTensor = tf.tensor2d(frames);
-  
-  // Apply FFT
   const spectrogramTensor = tf.abs(tf.spectral.rfft(frameTensor));
-  const spectrogram = await spectrogramTensor.array() as number[][];
+  const spectrogram = await spectrogramTensor.array();
   
-  // Extract features
+  if (!Array.isArray(spectrogram)) {
+    throw new Error('Failed to compute spectrogram');
+  }
+  
+  // Extract pitch using autocorrelation
   const pitch = extractPitch(frames, sampleRate);
+  
+  // Calculate energy
   const energy = calculateEnergy(frames);
-  const spectralFeatures = calculateSpectralFeatures(spectrogram);
+  
+  // Calculate spectral features
+  const spectralFeatures = calculateSpectralFeatures(spectrogram as number[][]);
+  
+  // Calculate tempo
   const tempo = calculateTempo(energy, sampleRate, hopSize);
+  
+  // Calculate zero-crossing rate
+  const zeroCrossings = calculateZeroCrossings(frames);
   
   // Cleanup tensors
   tf.dispose([frameTensor, spectrogramTensor]);
@@ -40,7 +53,8 @@ export const extractAudioFeatures = async (
     pitch,
     energy,
     spectralFeatures,
-    tempo
+    tempo,
+    zeroCrossings
   };
 };
 
@@ -66,7 +80,11 @@ const autocorrelation = (frame: Float32Array): Float32Array => {
 const findPitch = (acf: Float32Array, sampleRate: number): number => {
   let maxCorr = -Infinity;
   let pitch = 0;
-  for (let lag = 30; lag < acf.length / 2; lag++) {
+  // Search for pitch in the range 60Hz to 1600Hz
+  const minLag = Math.floor(sampleRate / 1600);
+  const maxLag = Math.floor(sampleRate / 60);
+  
+  for (let lag = minLag; lag <= maxLag; lag++) {
     if (acf[lag] > maxCorr) {
       maxCorr = acf[lag];
       pitch = sampleRate / lag;
@@ -107,4 +125,17 @@ const calculateTempo = (energy: number[], sampleRate: number, hopSize: number): 
   
   const duration = (energy.length * hopSize) / sampleRate;
   return (peaks / duration) * 60;
+};
+
+const calculateZeroCrossings = (frames: Float32Array[]): number[] => {
+  return frames.map(frame => {
+    let crossings = 0;
+    for (let i = 1; i < frame.length; i++) {
+      if ((frame[i] >= 0 && frame[i - 1] < 0) || 
+          (frame[i] < 0 && frame[i - 1] >= 0)) {
+        crossings++;
+      }
+    }
+    return crossings;
+  });
 };

@@ -62,7 +62,7 @@ const storeAnalysis = async (analysis: {
       pitch_mean: analysis.timeSeriesData.reduce((sum, data) => sum + data.pitch, 0) / analysis.timeSeriesData.length,
       energy_level: analysis.timeSeriesData.reduce((sum, data) => sum + data.energy, 0) / analysis.timeSeriesData.length,
       tempo: analysis.features.tempo,
-      file_path: 'temp' // Required field
+      file_path: 'temp'
     });
   
   if (error) {
