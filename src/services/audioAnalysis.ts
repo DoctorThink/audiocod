@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { analyzeAudioEmotion } from "./audio/emotionAnalyzer";
 import { calculateVoiceCharacteristics } from "./audio/voiceCharacteristics";
 import type { EmotionPrediction } from "./audio/emotionModel";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface AnalysisResult {
   speakerProfile: {
@@ -71,12 +72,18 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       }))
     };
 
+    // Convert emotions to a JSON-compatible object
+    const emotionScores: Json = Object.entries(mockResult.emotions).reduce(
+      (acc, [key, value]) => ({ ...acc, [key]: value }),
+      {}
+    );
+
     // Store analysis results in database
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
         file_path: filename,
-        emotion_scores: mockResult.emotions,
+        emotion_scores: emotionScores,
         pitch_mean: mockResult.speakerProfile.characteristics.pitchMean,
         pitch_range: mockResult.speakerProfile.characteristics.pitchRange,
         energy_level: mockResult.timeSeriesData[0].energy
