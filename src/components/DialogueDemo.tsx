@@ -1,58 +1,20 @@
 import { useState } from "react";
-import { Loader2, Mic, Upload, RotateCcw } from "lucide-react";
-import { Button } from "./ui/button";
 import { useToast } from "./ui/use-toast";
 import { analyzeAudio } from "@/services/audioAnalysis";
-import { Card, CardContent } from "./ui/card";
 import { motion, AnimatePresence } from "framer-motion";
-import AudioPlayer from "./demo/AudioPlayer";
 import AnalysisResults from "./demo/AnalysisResults";
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+import UploadSection from "./demo/UploadSection";
 
 const DialogueDemo = () => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFile = event.target.files?.[0];
-    if (!uploadedFile) return;
-
-    if (uploadedFile.size > MAX_FILE_SIZE) {
-      toast({
-        variant: "destructive",
-        title: "File too large",
-        description: "Please upload an MP3 file smaller than 5MB.",
-      });
-      return;
-    }
-
-    if (uploadedFile.type !== "audio/mpeg") {
-      toast({
-        variant: "destructive",
-        title: "Invalid file format",
-        description: "Please upload an MP3 file.",
-      });
-      return;
-    }
-
-    setFile(uploadedFile);
-    toast({
-      title: "File uploaded successfully",
-      description: "Your audio file is ready for analysis.",
-    });
-  };
-
-  const handleAnalysis = async () => {
-    if (!file) return;
-    
+  const handleAnalysis = async (file: File) => {
     setIsAnalyzing(true);
     try {
       const results = await analyzeAudio(file);
-      console.log('Analysis results:', results); // Debug log
+      console.log('Analysis results:', results);
       setAnalysisResults(results);
       toast({
         title: "Analysis complete",
@@ -71,9 +33,7 @@ const DialogueDemo = () => {
   };
 
   const resetAnalysis = () => {
-    setFile(null);
     setAnalysisResults(null);
-    setIsPlaying(false);
   };
 
   return (
@@ -106,89 +66,15 @@ const DialogueDemo = () => {
 
           <AnimatePresence mode="wait">
             {!analysisResults ? (
-              <motion.div
-                key="input"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card className="backdrop-blur-sm bg-white/80 border-primary-100 shadow-lg">
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-col items-center gap-4 sm:gap-6">
-                      {!file ? (
-                        <div className="w-full space-y-4">
-                          <label 
-                            htmlFor="audio-upload"
-                            className="block w-full p-4 sm:p-8 border-2 border-dashed border-primary-200 rounded-xl cursor-pointer hover:border-primary-400 transition-colors bg-primary-50/30"
-                          >
-                            <div className="flex flex-col items-center">
-                              <Upload className="w-8 sm:w-12 h-8 sm:h-12 text-primary-400 mb-2" />
-                              <span className="text-sm sm:text-base text-primary-600 font-medium text-center">
-                                Drop MP3 file here or tap to upload
-                              </span>
-                              <span className="text-xs text-gray-500 mt-1">Maximum file size: 5MB</span>
-                            </div>
-                            <input
-                              id="audio-upload"
-                              type="file"
-                              accept=".mp3,audio/mpeg"
-                              className="hidden"
-                              onChange={handleFileUpload}
-                            />
-                          </label>
-                          <div className="text-center text-gray-500">or</div>
-                          <Button 
-                            className="w-full py-6 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md text-lg"
-                            onClick={() => {/* Add recording logic */}}
-                          >
-                            <Mic className="w-5 h-5 mr-2" />
-                            Record Audio
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="w-full space-y-4 sm:space-y-6">
-                          <AudioPlayer 
-                            isPlaying={isPlaying} 
-                            onPlayPause={() => setIsPlaying(!isPlaying)} 
-                          />
-                          <Button 
-                            className="w-full py-4 sm:py-6 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md text-base sm:text-lg"
-                            onClick={handleAnalysis}
-                            disabled={isAnalyzing}
-                          >
-                            {isAnalyzing ? (
-                              <>
-                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                Processing Audio...
-                              </>
-                            ) : (
-                              <>
-                                <Mic className="w-5 h-5 mr-2" />
-                                Start Analysis
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <UploadSection 
+                onFileSelect={handleAnalysis}
+                isAnalyzing={isAnalyzing}
+              />
             ) : (
-              <motion.div
-                key="results"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="w-full"
-              >
-                <AnalysisResults 
-                  results={analysisResults}
-                  onReset={resetAnalysis}
-                />
-              </motion.div>
+              <AnalysisResults 
+                results={analysisResults}
+                onReset={resetAnalysis}
+              />
             )}
           </AnimatePresence>
         </motion.div>

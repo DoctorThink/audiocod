@@ -27,7 +27,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     const filename = `${crypto.randomUUID()}.mp3`;
     
     // Upload audio file
-    const { error: uploadError, data: uploadData } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('audio-files')
       .upload(filename, audioBlob, {
         contentType: 'audio/mpeg',
@@ -39,13 +39,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       throw uploadError;
     }
 
-    // Analyze emotions
-    const emotionAnalysis = await analyzeAudioEmotion(audioBlob);
-    
-    // Calculate voice characteristics
-    const characteristics = calculateVoiceCharacteristics(emotionAnalysis.timeSeriesData);
-
-    // Create mock data for testing
+    // Create mock result for testing
     const mockResult: AnalysisResult = {
       speakerProfile: {
         id: crypto.randomUUID(),
