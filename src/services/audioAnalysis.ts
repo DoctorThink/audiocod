@@ -27,7 +27,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     const filename = `${crypto.randomUUID()}.mp3`;
     
     // Upload audio file
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError, data: uploadData } = await supabase.storage
       .from('audio-files')
       .upload(filename, audioBlob, {
         contentType: 'audio/mpeg',
@@ -39,48 +39,44 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       throw uploadError;
     }
 
-    // Create mock result for testing
-    const mockResult: AnalysisResult = {
+    // Process audio data
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const audioData = audioBuffer.getChannelData(0);
+
+    // Analyze emotions using the enhanced model
+    const emotionAnalysis = await analyzeAudioEmotion(audioBlob);
+    const voiceCharacteristics = calculateVoiceCharacteristics(emotionAnalysis.timeSeriesData);
+
+    // Create analysis result
+    const result: AnalysisResult = {
       speakerProfile: {
         id: crypto.randomUUID(),
-        confidence: 0.85,
-        characteristics: {
-          voiceQuality: 0.75,
-          clarity: 0.9,
-          stability: 0.8,
-          pitchMean: 220,
-          pitchRange: [180, 260]
-        }
+        confidence: emotionAnalysis.confidence,
+        characteristics: voiceCharacteristics
       },
-      emotions: {
-        neutral: 0.2,
-        happy: 0.4,
-        sad: 0.1,
-        angry: 0.2,
-        fearful: 0.1
-      },
-      timeSeriesData: Array.from({ length: 50 }, (_, i) => ({
-        time: i * 0.1,
-        pitch: 220 + Math.sin(i * 0.2) * 20,
-        energy: 0.5 + Math.cos(i * 0.3) * 0.3
-      }))
+      emotions: emotionAnalysis.emotions,
+      timeSeriesData: emotionAnalysis.timeSeriesData
     };
 
     // Convert emotions to a JSON-compatible object
-    const emotionScores: Json = Object.entries(mockResult.emotions).reduce(
+    const emotionScores: Json = Object.entries(result.emotions).reduce(
       (acc, [key, value]) => ({ ...acc, [key]: value }),
       {}
     );
 
-    // Store analysis results in database
+    // Store analysis results
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
         file_path: filename,
         emotion_scores: emotionScores,
-        pitch_mean: mockResult.speakerProfile.characteristics.pitchMean,
-        pitch_range: mockResult.speakerProfile.characteristics.pitchRange,
-        energy_level: mockResult.timeSeriesData[0].energy
+        pitch_mean: voiceCharacteristics.pitchMean,
+        pitch_range: voiceCharacteristics.pitchRange,
+        energy_level: result.timeSeriesData[0].energy,
+        spectral_features: Array.from(new Float32Array(32)), // Placeholder for spectral features
+        tempo: 120 // Default tempo, will be calculated in the next step
       });
 
     if (dbError) {
@@ -88,7 +84,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       throw dbError;
     }
 
-    return mockResult;
+    return result;
   } catch (error) {
     console.error('Audio analysis error:', error);
     throw error instanceof Error 

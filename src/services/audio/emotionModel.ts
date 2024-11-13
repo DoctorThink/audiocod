@@ -17,50 +17,59 @@ class EmotionModel {
     
     const model = tf.sequential();
     
-    // Input layer for enhanced features
+    // Enhanced model architecture
     model.add(tf.layers.dense({
-      units: 128,
-      activation: 'elu',
-      inputShape: [43] // Updated for new features
+      units: 256,
+      activation: 'relu',
+      inputShape: [43], // Updated input shape for enhanced features
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 })
     }));
     
-    // Add batch normalization
     model.add(tf.layers.batchNormalization());
-    
-    // First hidden layer
-    model.add(tf.layers.dense({
-      units: 64,
-      activation: 'elu'
-    }));
     model.add(tf.layers.dropout({ rate: 0.3 }));
     
-    // Second hidden layer
+    // Deep architecture for better feature extraction
     model.add(tf.layers.dense({
-      units: 32,
-      activation: 'elu'
+      units: 128,
+      activation: 'relu',
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 })
     }));
+    
+    model.add(tf.layers.batchNormalization());
     model.add(tf.layers.dropout({ rate: 0.2 }));
     
-    // Output layer
+    model.add(tf.layers.dense({
+      units: 64,
+      activation: 'relu',
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 })
+    }));
+    
+    model.add(tf.layers.batchNormalization());
+    
+    // Output layer with softmax for emotion probabilities
     model.add(tf.layers.dense({
       units: 5,
       activation: 'softmax'
     }));
     
+    // Advanced optimizer configuration
+    const optimizer = tf.train.adam(0.001, 0.9, 0.999, 1e-7);
+    
     model.compile({
-      optimizer: tf.train.adam(0.001),
+      optimizer,
       loss: 'categoricalCrossentropy',
       metrics: ['accuracy']
     });
     
     this.model = model;
-    await this.loadWeights();
+    await this.loadPretrainedWeights();
   }
   
-  private async loadWeights() {
+  private async loadPretrainedWeights() {
+    // Initialize with normalized random weights for testing
+    // In production, you would load pre-trained weights here
     if (!this.model) return;
     
-    // Initialize with zeros for testing
     const prediction = this.model.predict(tf.zeros([1, 43])) as tf.Tensor;
     prediction.dispose();
   }
@@ -68,74 +77,49 @@ class EmotionModel {
   async predict(features: AudioFeatures): Promise<EmotionPrediction> {
     if (!this.model) await this.initialize();
     
-    const meanPitch = features.pitch.reduce((a, b) => a + b, 0) / features.pitch.length;
-    const meanEnergy = features.energy.reduce((a, b) => a + b, 0) / features.energy.length;
-    const meanZeroCrossings = features.zeroCrossings ? 
-      features.zeroCrossings.reduce((a, b) => a + b, 0) / features.zeroCrossings.length : 0;
+    // Feature engineering and normalization
+    const processedFeatures = this.preprocessFeatures(features);
     
-    const inputFeatures = tf.tensor2d([[
-      meanPitch,
-      meanEnergy,
-      features.tempo,
-      meanZeroCrossings,
-      ...Array.from(features.spectralFeatures)
-    ]]);
-    
+    const inputFeatures = tf.tensor2d([processedFeatures]);
     const prediction = this.model!.predict(inputFeatures) as tf.Tensor;
     const probabilities = await prediction.array() as number[][];
     
+    // Cleanup tensors
     inputFeatures.dispose();
     prediction.dispose();
     
-    const result: EmotionPrediction = {
+    return {
       neutral: probabilities[0][0],
       happy: probabilities[0][1],
       sad: probabilities[0][2],
       angry: probabilities[0][3],
       fearful: probabilities[0][4]
     };
-    
-    // Apply quality-based calibration
-    return this.calibratePredictions(result, features);
   }
   
-  private calibratePredictions(
-    prediction: EmotionPrediction,
-    features: AudioFeatures
-  ): EmotionPrediction {
-    // Calculate voice quality metrics
-    const pitchStability = this.calculatePitchStability(features.pitch);
-    const energyClarity = this.calculateEnergyClarity(features.energy);
-    const voiceQuality = (pitchStability + energyClarity) / 2;
+  private preprocessFeatures(features: AudioFeatures): number[] {
+    const meanPitch = features.pitch.reduce((a, b) => a + b, 0) / features.pitch.length;
+    const meanEnergy = features.energy.reduce((a, b) => a + b, 0) / features.energy.length;
+    const pitchVariance = this.calculateVariance(features.pitch, meanPitch);
+    const energyVariance = this.calculateVariance(features.energy, meanEnergy);
     
-    // Apply quality-based adjustments
-    const qualityFactor = Math.max(0.1, voiceQuality);
-    const calibrated: EmotionPrediction = {} as EmotionPrediction;
-    let total = 0;
+    // Advanced feature engineering
+    const zeroCrossingRate = features.zeroCrossings ? 
+      features.zeroCrossings.reduce((a, b) => a + b, 0) / features.zeroCrossings.length : 0;
     
-    for (const [emotion, value] of Object.entries(prediction)) {
-      calibrated[emotion as keyof EmotionPrediction] = value * qualityFactor;
-      total += value * qualityFactor;
-    }
-    
-    // Normalize to ensure sum is 1
-    for (const emotion of Object.keys(calibrated)) {
-      calibrated[emotion as keyof EmotionPrediction] /= total;
-    }
-    
-    return calibrated;
+    return [
+      meanPitch,
+      meanEnergy,
+      pitchVariance,
+      energyVariance,
+      zeroCrossingRate,
+      features.tempo,
+      ...Array.from(features.spectralFeatures)
+    ];
   }
   
-  private calculatePitchStability(pitch: number[]): number {
-    const mean = pitch.reduce((a, b) => a + b, 0) / pitch.length;
-    const variance = pitch.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / pitch.length;
-    return 1 / (1 + variance);
-  }
-  
-  private calculateEnergyClarity(energy: number[]): number {
-    const mean = energy.reduce((a, b) => a + b, 0) / energy.length;
-    const variance = energy.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / energy.length;
-    return 1 / (1 + variance);
+  private calculateVariance(values: number[], mean: number): number {
+    return values.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / values.length;
   }
 }
 
