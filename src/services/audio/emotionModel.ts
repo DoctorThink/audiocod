@@ -1,96 +1,87 @@
 import * as tf from '@tensorflow/tfjs';
+import type { AudioFeatures } from './emotionFeatureExtractor';
 
-// Define the model architecture
-export const createEmotionModel = () => {
-  const model = tf.sequential();
-  
-  // Input layer for our audio features
-  model.add(tf.layers.dense({
-    units: 64,
-    activation: 'relu',
-    inputShape: [40] // 40 features from our mel spectrogram
-  }));
-  
-  model.add(tf.layers.dropout({ rate: 0.3 }));
-  
-  model.add(tf.layers.dense({
-    units: 32,
-    activation: 'relu'
-  }));
-  
-  model.add(tf.layers.dropout({ rate: 0.2 }));
-  
-  // Output layer with 5 units for our emotions
-  model.add(tf.layers.dense({
-    units: 5,
-    activation: 'softmax'
-  }));
-  
-  model.compile({
-    optimizer: tf.train.adam(0.001),
-    loss: 'categoricalCrossentropy',
-    metrics: ['accuracy']
-  });
-  
-  return model;
-};
+export interface EmotionPrediction {
+  neutral: number;
+  happy: number;
+  sad: number;
+  angry: number;
+  fearful: number;
+}
 
-// Training data examples (these would typically come from a larger dataset)
-export const trainingData = {
-  features: [
-    // Happy examples
-    [/* high energy, rising pitch */],
-    // Sad examples
-    [/* low energy, falling pitch */],
-    // Angry examples
-    [/* high energy, sharp variations */],
-    // Fearful examples
-    [/* irregular patterns, trembling */],
-    // Neutral examples
-    [/* steady patterns, moderate energy */]
-  ],
-  labels: [
-    [1, 0, 0, 0, 0], // Happy
-    [0, 1, 0, 0, 0], // Sad
-    [0, 0, 1, 0, 0], // Angry
-    [0, 0, 0, 1, 0], // Fearful
-    [0, 0, 0, 0, 1]  // Neutral
-  ]
-};
+class EmotionModel {
+  private model: tf.LayersModel | null = null;
+  
+  async initialize() {
+    if (this.model) return;
+    
+    const model = tf.sequential();
+    
+    // Input layer for processed audio features
+    model.add(tf.layers.dense({
+      units: 64,
+      activation: 'relu',
+      inputShape: [43] // 40 mel bands + pitch + energy + tempo
+    }));
+    
+    // Hidden layers
+    model.add(tf.layers.dropout({ rate: 0.3 }));
+    model.add(tf.layers.dense({ units: 32, activation: 'relu' }));
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+    
+    // Output layer for 5 emotions
+    model.add(tf.layers.dense({
+      units: 5,
+      activation: 'softmax'
+    }));
+    
+    model.compile({
+      optimizer: tf.train.adam(0.001),
+      loss: 'categoricalCrossentropy',
+      metrics: ['accuracy']
+    });
+    
+    this.model = model;
+    await this.loadWeights();
+  }
+  
+  private async loadWeights() {
+    // In a real implementation, we would load pre-trained weights here
+    // For now, we'll use random weights for demonstration
+    await this.model!.predict(tf.zeros([1, 43])).dispose();
+  }
+  
+  async predict(features: AudioFeatures): Promise<EmotionPrediction> {
+    if (!this.model) await this.initialize();
+    
+    // Prepare input features
+    const meanPitch = features.pitch.reduce((a, b) => a + b, 0) / features.pitch.length;
+    const meanEnergy = features.energy.reduce((a, b) => a + b, 0) / features.energy.length;
+    
+    // Combine all features
+    const inputFeatures = tf.tensor2d([[
+      meanPitch,
+      meanEnergy,
+      features.tempo,
+      ...Array.from(features.spectralFeatures)
+    ]]);
+    
+    // Make prediction
+    const prediction = this.model!.predict(inputFeatures) as tf.Tensor;
+    const probabilities = await prediction.array();
+    
+    // Cleanup
+    inputFeatures.dispose();
+    prediction.dispose();
+    
+    return {
+      neutral: probabilities[0][0],
+      happy: probabilities[0][1],
+      sad: probabilities[0][2],
+      angry: probabilities[0][3],
+      fearful: probabilities[0][4]
+    };
+  }
+}
 
-// Function to train the model
-export const trainModel = async (model: tf.Sequential, features: number[][], labels: number[][]) => {
-  const xs = tf.tensor2d(features);
-  const ys = tf.tensor2d(labels);
-  
-  await model.fit(xs, ys, {
-    epochs: 50,
-    batchSize: 32,
-    validationSplit: 0.2,
-    callbacks: {
-      onEpochEnd: (epoch, logs) => {
-        console.log(`Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}`);
-      }
-    }
-  });
-  
-  xs.dispose();
-  ys.dispose();
-};
-
-// Function to predict emotions from features
-export const predictEmotion = async (model: tf.Sequential, features: number[]) => {
-  const input = tf.tensor2d([features]);
-  const prediction = model.predict(input) as tf.Tensor;
-  const probabilities = await prediction.array();
-  input.dispose();
-  prediction.dispose();
-  
-  return {
-    neutral: probabilities[0][4],
-    happy: probabilities[0][0],
-    sad: probabilities[0][1],
-    angry: probabilities[0][2],
-    fearful: probabilities[0][3]
-  };
-};
+export const emotionModel = new EmotionModel();
