@@ -52,12 +52,14 @@ const DialogueDemo = () => {
     setIsAnalyzing(true);
     try {
       const results = await analyzeAudio(file);
+      console.log('Analysis results:', results); // Debug log
       setAnalysisResults(results);
       toast({
         title: "Analysis complete",
         description: "Your audio has been analyzed successfully.",
       });
     } catch (error) {
+      console.error('Analysis error:', error);
       toast({
         variant: "destructive",
         title: "Analysis failed",
