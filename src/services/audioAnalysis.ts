@@ -57,13 +57,17 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         characteristics: voiceCharacteristics
       },
       emotions: emotionAnalysis.emotions,
-      timeSeriesData: emotionAnalysis.timeSeriesData
+      timeSeriesData: emotionAnalysis.timeSeriesData.map((data, index) => ({
+        time: index / 100, // Convert to seconds
+        pitch: data.pitch || 0,
+        energy: data.energy || 0
+      }))
     };
 
     // Convert emotions to a JSON-compatible object
-    const emotionScores: Json = Object.entries(result.emotions).reduce(
+    const emotionScores = Object.entries(result.emotions).reduce(
       (acc, [key, value]) => ({ ...acc, [key]: value }),
-      {}
+      {} as Record<string, number>
     );
 
     // Store analysis results
@@ -76,7 +80,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         pitch_range: voiceCharacteristics.pitchRange,
         energy_level: result.timeSeriesData[0].energy,
         spectral_features: Array.from(new Float32Array(32)), // Placeholder for spectral features
-        tempo: 120 // Default tempo, will be calculated in the next step
+        tempo: 120 // Default tempo
       });
 
     if (dbError) {
