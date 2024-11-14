@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useToast } from "./ui/use-toast";
+import { useToast } from "../hooks/use-toast";
 import { analyzeAudio } from "@/services/audioAnalysis";
 import { motion, AnimatePresence } from "framer-motion";
 import AnalysisResults from "./demo/AnalysisResults";
@@ -15,12 +15,14 @@ const DialogueDemo = () => {
   const handleAnalysis = async (file: File) => {
     setIsAnalyzing(true);
     setAnalysisProgress(0);
+    
     try {
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setAnalysisProgress(prev => Math.min(prev + 10, 90));
       }, 500);
 
+      console.log('Starting analysis for file:', file.name);
       const results = await analyzeAudio(file);
       clearInterval(progressInterval);
       setAnalysisProgress(100);

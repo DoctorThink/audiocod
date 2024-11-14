@@ -5,7 +5,7 @@ import { RotateCcw } from "lucide-react";
 import EmotionChart from "../audio/EmotionChart";
 import VoiceMetrics from "../audio/VoiceMetrics";
 import Seismograph from "./Seismograph";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { AnalysisResult } from "@/services/audioAnalysis";
 
 interface AnalysisResultsProps {
@@ -14,7 +14,12 @@ interface AnalysisResultsProps {
 }
 
 const AnalysisResults = ({ results, onReset }: AnalysisResultsProps) => {
-  if (!results) return null;
+  console.log('Rendering analysis results:', results);
+
+  if (!results) {
+    console.log('No results provided');
+    return null;
+  }
 
   return (
     <motion.div

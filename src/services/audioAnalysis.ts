@@ -25,6 +25,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
 
   try {
     const filename = `${crypto.randomUUID()}.mp3`;
+    console.log('Generated filename:', filename);
     
     // Upload audio file
     const { error: uploadError, data: uploadData } = await supabase.storage
@@ -39,15 +40,21 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       throw uploadError;
     }
 
+    console.log('File uploaded successfully:', uploadData);
+
     // Process audio data
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     const audioData = audioBuffer.getChannelData(0);
 
+    console.log('Audio data processed, starting emotion analysis');
+
     // Analyze emotions using the enhanced model
     const emotionAnalysis = await analyzeAudioEmotion(audioBlob);
     const voiceCharacteristics = calculateVoiceCharacteristics(emotionAnalysis.timeSeriesData);
+
+    console.log('Emotion analysis completed:', emotionAnalysis);
 
     // Create analysis result
     const result: AnalysisResult = {
@@ -65,17 +72,19 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     };
 
     // Convert emotions to a JSON-compatible object
-    const emotionScores = Object.entries(result.emotions).reduce(
-      (acc, [key, value]) => ({ ...acc, [key]: value }),
-      {} as Record<string, number>
-    );
+    const emotionScores: Record<string, number> = {};
+    Object.entries(result.emotions).forEach(([key, value]) => {
+      emotionScores[key] = value;
+    });
+
+    console.log('Preparing to store analysis results');
 
     // Store analysis results
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
         file_path: filename,
-        emotion_scores: emotionScores,
+        emotion_scores: emotionScores as Json,
         pitch_mean: voiceCharacteristics.pitchMean,
         pitch_range: voiceCharacteristics.pitchRange,
         energy_level: result.timeSeriesData[0].energy,
@@ -88,6 +97,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       throw dbError;
     }
 
+    console.log('Analysis results stored successfully');
     return result;
   } catch (error) {
     console.error('Audio analysis error:', error);
