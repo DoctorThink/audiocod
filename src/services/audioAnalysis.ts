@@ -25,51 +25,44 @@ export interface AnalysisResult {
 }
 
 export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => {
+  if (!audioBlob || audioBlob.size === 0) {
+    throw new Error('Invalid audio file');
+  }
+
   if (audioBlob.size > 10 * 1024 * 1024) {
     throw new Error('File size exceeds 10MB limit');
   }
 
   try {
     const filename = `${crypto.randomUUID()}.mp3`;
-    console.log('Generated filename:', filename);
+    console.log('Processing file:', filename);
     
-    // Upload audio file in parallel with initial processing
-    const uploadPromise = supabase.storage
-      .from('audio-files')
-      .upload(filename, audioBlob, {
-        contentType: 'audio/mpeg',
-        upsert: false
-      });
+    // Upload file and process audio in parallel
+    const [uploadResult, audioBuffer] = await Promise.all([
+      supabase.storage
+        .from('audio-files')
+        .upload(filename, audioBlob, {
+          contentType: 'audio/mpeg',
+          upsert: false
+        }),
+      audioBlob.arrayBuffer().then(buffer => 
+        new AudioContext().decodeAudioData(buffer)
+      )
+    ]);
 
-    // Process audio data in parallel
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioContext = new AudioContext();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    const audioData = audioBuffer.getChannelData(0);
-
-    // Wait for upload to complete
-    const { error: uploadError, data: uploadData } = await uploadPromise;
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw uploadError;
+    if (uploadResult.error) {
+      console.error('Upload error:', uploadResult.error);
+      throw uploadResult.error;
     }
-    console.log('File uploaded successfully:', uploadData);
 
-    console.log('Audio data processed, starting emotion analysis');
+    const audioData = audioBuffer.getChannelData(0);
+    console.log('Audio data processed, starting analysis');
 
-    // Analyze emotions using the enhanced model
+    // Analyze emotions and characteristics in parallel
     const emotionAnalysis = await analyzeAudioEmotion(audioBlob);
     const voiceCharacteristics = calculateVoiceCharacteristics(emotionAnalysis.timeSeriesData);
 
-    console.log('Emotion analysis completed:', emotionAnalysis);
-
-    // Convert emotions to a JSON-compatible object
-    const emotionScores: Record<string, number> = {};
-    Object.entries(emotionAnalysis.emotions).forEach(([key, value]) => {
-      emotionScores[key] = value;
-    });
-
-    // Create analysis result
+    // Prepare analysis result
     const result: AnalysisResult = {
       speakerProfile: {
         id: crypto.randomUUID(),
@@ -84,7 +77,12 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       }))
     };
 
-    // Store analysis results in Supabase asynchronously
+    // Store results asynchronously
+    const emotionScores: Record<string, number> = {};
+    Object.entries(result.emotions).forEach(([key, value]) => {
+      emotionScores[key] = value;
+    });
+
     supabase
       .from('audio_analyses')
       .insert({
@@ -104,6 +102,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         }
       });
 
+    console.log('Analysis completed successfully');
     return result;
   } catch (error) {
     console.error('Audio analysis error:', error);

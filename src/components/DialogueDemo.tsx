@@ -19,7 +19,6 @@ const DialogueDemo = () => {
     setAnalysisResults(null);
     
     try {
-      // More frequent progress updates
       const progressInterval = setInterval(() => {
         setAnalysisProgress(prev => {
           if (prev >= 90) return prev;
@@ -30,14 +29,15 @@ const DialogueDemo = () => {
       console.log('Starting analysis for file:', file.name);
       const results = await analyzeAudio(file);
       clearInterval(progressInterval);
-      setAnalysisProgress(100);
       
-      console.log('Analysis results:', results);
-      if (!results) {
-        throw new Error("Analysis failed to return results");
+      console.log('Analysis completed, results:', results);
+      if (!results || !results.speakerProfile || !results.emotions) {
+        throw new Error("Analysis failed: Invalid results format");
       }
       
+      setAnalysisProgress(100);
       setAnalysisResults(results);
+      
       toast({
         title: "Analysis complete",
         description: "Your audio has been analyzed successfully.",
@@ -62,16 +62,16 @@ const DialogueDemo = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 via-white to-primary-50">
-      <div className="container mx-auto px-4 py-8 sm:py-20">
+      <div className="container mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="max-w-4xl mx-auto"
         >
-          <div className="text-center mb-8 sm:mb-12">
+          <div className="text-center mb-8">
             <motion.h2 
-              className="text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800 mb-3 sm:mb-4"
+              className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800 mb-3"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
@@ -79,7 +79,7 @@ const DialogueDemo = () => {
               Voice Analysis
             </motion.h2>
             <motion.p 
-              className="text-lg sm:text-xl text-gray-600"
+              className="text-lg text-gray-600"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
