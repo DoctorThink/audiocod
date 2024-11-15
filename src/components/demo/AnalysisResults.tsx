@@ -16,8 +16,8 @@ interface AnalysisResultsProps {
 const AnalysisResults = ({ results, onReset }: AnalysisResultsProps) => {
   console.log('Rendering analysis results:', results);
 
-  if (!results) {
-    console.log('No results provided');
+  if (!results || !results.speakerProfile || !results.emotions) {
+    console.log('Invalid results provided');
     return null;
   }
 

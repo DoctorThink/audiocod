@@ -5,16 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import AnalysisResults from "./demo/AnalysisResults";
 import UploadSection from "./demo/UploadSection";
 import AnalysisProgress from "./demo/AnalysisProgress";
+import type { AnalysisResult } from "@/services/audioAnalysis";
 
 const DialogueDemo = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const { toast } = useToast();
 
   const handleAnalysis = async (file: File) => {
     setIsAnalyzing(true);
     setAnalysisProgress(0);
+    setAnalysisResults(null);
     
     try {
       // Simulate progress updates
@@ -28,7 +30,9 @@ const DialogueDemo = () => {
       setAnalysisProgress(100);
       
       console.log('Analysis results:', results);
-      if (!results) throw new Error("Analysis failed to return results");
+      if (!results) {
+        throw new Error("Analysis failed to return results");
+      }
       
       setAnalysisResults(results);
       toast({
@@ -42,6 +46,7 @@ const DialogueDemo = () => {
         title: "Analysis failed",
         description: error instanceof Error ? error.message : "An error occurred during analysis",
       });
+      setAnalysisResults(null);
     } finally {
       setIsAnalyzing(false);
     }

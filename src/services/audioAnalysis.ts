@@ -8,7 +8,13 @@ export interface AnalysisResult {
   speakerProfile: {
     id: string;
     confidence: number;
-    characteristics: ReturnType<typeof calculateVoiceCharacteristics>;
+    characteristics: {
+      voiceQuality: number;
+      clarity: number;
+      stability: number;
+      pitchMean: number;
+      pitchRange: [number, number];
+    };
   };
   emotions: EmotionPrediction;
   timeSeriesData: Array<{
@@ -56,6 +62,12 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
 
     console.log('Emotion analysis completed:', emotionAnalysis);
 
+    // Convert emotions to a JSON-compatible object
+    const emotionScores: Record<string, number> = {};
+    Object.entries(emotionAnalysis.emotions).forEach(([key, value]) => {
+      emotionScores[key] = value;
+    });
+
     // Create analysis result
     const result: AnalysisResult = {
       speakerProfile: {
@@ -71,15 +83,7 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       }))
     };
 
-    // Convert emotions to a JSON-compatible object
-    const emotionScores: Record<string, number> = {};
-    Object.entries(result.emotions).forEach(([key, value]) => {
-      emotionScores[key] = value;
-    });
-
-    console.log('Preparing to store analysis results');
-
-    // Store analysis results
+    // Store analysis results in Supabase
     const { error: dbError } = await supabase
       .from('audio_analyses')
       .insert({
