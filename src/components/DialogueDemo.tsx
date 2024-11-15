@@ -19,10 +19,13 @@ const DialogueDemo = () => {
     setAnalysisResults(null);
     
     try {
-      // Simulate progress updates
+      // More frequent progress updates
       const progressInterval = setInterval(() => {
-        setAnalysisProgress(prev => Math.min(prev + 10, 90));
-      }, 500);
+        setAnalysisProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + 5;
+        });
+      }, 300);
 
       console.log('Starting analysis for file:', file.name);
       const results = await analyzeAudio(file);

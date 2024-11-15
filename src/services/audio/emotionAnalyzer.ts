@@ -13,16 +13,17 @@ export interface EmotionAnalysis {
 }
 
 export const analyzeAudioEmotion = async (audioBlob: Blob): Promise<EmotionAnalysis> => {
+  // Process audio data
   const arrayBuffer = await audioBlob.arrayBuffer();
   const audioContext = new AudioContext();
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
   const audioData = audioBuffer.getChannelData(0);
   
-  // Extract advanced audio features
-  const features = await extractAudioFeatures(audioData, audioBuffer.sampleRate);
-  
-  // Initialize and warm up the model
-  await emotionModel.initialize();
+  // Extract features in parallel with model initialization
+  const [features, _] = await Promise.all([
+    extractAudioFeatures(audioData, audioBuffer.sampleRate),
+    emotionModel.initialize()
+  ]);
   
   // Get emotion predictions
   const emotions = await emotionModel.predict(features);
@@ -51,7 +52,7 @@ const generateTimeSeriesData = (
   features: any,
   sampleRate: number
 ): Array<{ time: number; pitch: number; energy: number }> => {
-  const hopSize = 512; // Standard hop size for audio analysis
+  const hopSize = 512;
   return features.pitch.map((pitch: number, i: number) => ({
     time: (i * hopSize) / sampleRate,
     pitch,

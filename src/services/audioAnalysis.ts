@@ -33,26 +33,27 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
     const filename = `${crypto.randomUUID()}.mp3`;
     console.log('Generated filename:', filename);
     
-    // Upload audio file
-    const { error: uploadError, data: uploadData } = await supabase.storage
+    // Upload audio file in parallel with initial processing
+    const uploadPromise = supabase.storage
       .from('audio-files')
       .upload(filename, audioBlob, {
         contentType: 'audio/mpeg',
         upsert: false
       });
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw uploadError;
-    }
-
-    console.log('File uploaded successfully:', uploadData);
-
-    // Process audio data
+    // Process audio data in parallel
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioContext = new AudioContext();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     const audioData = audioBuffer.getChannelData(0);
+
+    // Wait for upload to complete
+    const { error: uploadError, data: uploadData } = await uploadPromise;
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw uploadError;
+    }
+    console.log('File uploaded successfully:', uploadData);
 
     console.log('Audio data processed, starting emotion analysis');
 
@@ -77,14 +78,14 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
       },
       emotions: emotionAnalysis.emotions,
       timeSeriesData: emotionAnalysis.timeSeriesData.map((data, index) => ({
-        time: index / 100, // Convert to seconds
+        time: index / 100,
         pitch: data.pitch || 0,
         energy: data.energy || 0
       }))
     };
 
-    // Store analysis results in Supabase
-    const { error: dbError } = await supabase
+    // Store analysis results in Supabase asynchronously
+    supabase
       .from('audio_analyses')
       .insert({
         file_path: filename,
@@ -92,16 +93,17 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<AnalysisResult> => 
         pitch_mean: voiceCharacteristics.pitchMean,
         pitch_range: voiceCharacteristics.pitchRange,
         energy_level: result.timeSeriesData[0].energy,
-        spectral_features: Array.from(new Float32Array(32)), // Placeholder for spectral features
-        tempo: 120 // Default tempo
+        spectral_features: Array.from(new Float32Array(32)),
+        tempo: 120
+      })
+      .then(({ error: dbError }) => {
+        if (dbError) {
+          console.error('Database error:', dbError);
+        } else {
+          console.log('Analysis results stored successfully');
+        }
       });
 
-    if (dbError) {
-      console.error('Database error:', dbError);
-      throw dbError;
-    }
-
-    console.log('Analysis results stored successfully');
     return result;
   } catch (error) {
     console.error('Audio analysis error:', error);
